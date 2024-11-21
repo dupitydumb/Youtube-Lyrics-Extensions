@@ -294,10 +294,8 @@ function createNewDiv(itemsDiv) {
   lyricsTypeSelect.addEventListener("change", (e) => {
     if (e.target.value === "sync") {
       isSyncLyrics = true;
-      startSyncLyrics();
     } else {
       isSyncLyrics = false;
-      setLyrics(plainLyrics);
     }
   });
   lyricsTypePanel.appendChild(lyricsTypeLabel);
