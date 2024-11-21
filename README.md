@@ -1,4 +1,4 @@
-## Youtube Lyrics Chrome Extensions 🎶🎶
+## Youtube Lyrics Chrome Extensions 🎶🎶 [On Development]
 
 Let you add and customize your own lyrics
 
