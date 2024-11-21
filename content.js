@@ -3,43 +3,85 @@ let syncLyrics = [];
 let isSyncLyrics = false;
 let artistNameElement = "";
 let delay = 0;
+let hasRun = false;
 window.onload = function () {
   const currentURL = window.location.href;
   // Allow the extension to run only on YouTube video URLs
   const videoURLPattern = /^https:\/\/www\.youtube\.com\/watch\?v=/;
-  let hasRun = false;
-  if (videoURLPattern.test(currentURL)) {
-    console.log("This is a YouTube video page");
-    injectTailwindCSS();
-    const observer = new MutationObserver((mutations, obs) => {
-      const itemsDiv = document.querySelector("#secondary-inner");
-      if (itemsDiv && !hasRun) {
-        console.log(itemsDiv);
-        const videoTitleElement = document.querySelector(
+  let currentTittle = "";
+  function initialize() {
+    if (videoURLPattern.test(window.location.href)) {
+      console.log("This is a YouTube video page");
+
+      // Inject Tailwind CSS
+      injectTailwindCSS();
+
+      const observer = new MutationObserver((mutations, obs) => {
+        const itemsDiv = document.querySelector("#secondary-inner");
+        const title = document.querySelector(
           "#title > h1 > yt-formatted-string"
         );
-        artistNameElement = document.querySelector("#text").innerText;
-        console.log("Artist name:", artistNameElement);
-        const videoTitle = videoTitleElement
-          ? videoTitleElement.textContent + " |" + artistNameElement
-          : "No title found";
-        // Extract the video title
-        console.log("Video title:", formattedTitle(videoTitle));
-        getLyrics(formattedTitle(videoTitle));
-        createNewDiv(itemsDiv);
-        // Create style if isSyncLyrics is true
-        hasRun = true;
-        obs.disconnect(); // Stop observing once the target element is found
-      }
-    });
+        if (itemsDiv && !hasRun && title) {
+          console.log(itemsDiv);
+          const videoTitleElement = document.querySelector(
+            "#title > h1 > yt-formatted-string"
+          );
+          currentTittle = document.querySelector(
+            "#title > h1 > yt-formatted-string"
+          ).innerHTML;
+          const artistNameElementNode = document.querySelector("#text > a");
+          if (artistNameElementNode) {
+            artistNameElement = artistNameElementNode.innerHTML;
+          } else {
+            artistNameElement = "Unknown Artist";
+          }
+          const videoTitle = videoTitleElement
+            ? videoTitleElement.textContent + " |" + artistNameElement
+            : "No title found";
+          // Extract the video title
+          console.log("Video title:", formattedTitle(videoTitle));
+          getLyrics(formattedTitle(videoTitle));
+          createNewDiv(itemsDiv);
+          // Create style if isSyncLyrics is true
+          hasRun = true;
+          obs.disconnect(); // Stop observing once the target element is found
+        }
+      });
 
-    // Start observing the document body for changes
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+      // Start observing the document body for changes
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    }
   }
+
+  // Initialize on page load
+  initialize();
+
+  let lastTitle = currentTittle;
+  // Listen for title changes
+  new MutationObserver(() => {
+    const title = document.querySelector("#title > h1 > yt-formatted-string");
+    if (title && title.textContent !== lastTitle) {
+      lastTitle = title.textContent;
+      hasRun = false; // Reset the flag to allow re-initialization
+      initialize();
+    }
+  }).observe(document, { subtree: true, childList: true });
+
+  // // Listen for URL changes
+  // let lastUrl = currentURL;
+  // new MutationObserver(() => {
+  //   const url = window.location.href;
+  //   if (url !== lastUrl) {
+  //     lastUrl = url;
+  //     hasRun = false; // Reset the flag to allow re-initialization
+  //     initialize();
+  //   }
+  // }).observe(document, { subtree: true, childList: true });
 };
+
 let hasTryAgain = false;
 let datas = [];
 function getLyrics(title) {
@@ -147,6 +189,7 @@ function startSyncLyrics() {
     return;
   }
   const videoElement = document.getElementsByTagName("video")[0];
+  isVideoPlaying = true;
   videoElement.addEventListener("play", () => {
     isVideoPlaying = true;
   });
@@ -226,6 +269,10 @@ function updateTitle(title) {
 }
 
 function createNewDiv(itemsDiv) {
+  if (document.getElementById("Lyric-Panel")) {
+    return;
+  }
+
   const videoTitleElement = document.querySelector(
     "#title > h1 > yt-formatted-string"
   );
@@ -264,8 +311,8 @@ function createNewDiv(itemsDiv) {
   const delayInput = document.createElement("input");
   delayInput.type = "number";
   delayInput.value = 0;
-  delayInput.min = -10;
-  delayInput.max = 10;
+  delayInput.min = -200;
+  delayInput.max = 200;
   delayInput.className =
     "border border-gray-300 rounded-lg p-1 focus:outline-none";
   delayInput.addEventListener("input", (e) => {
@@ -372,14 +419,20 @@ function setSyncLyrics(lyrics) {
     // sync the lyricsElement with the currentLyric based on the index
     lyricElements.forEach((element) => {
       element.style.opacity = "0.2";
+      element.style.filter = "blur(5px)";
     });
     lyricElements[currentIndex].style.opacity = "1";
+    lyricElements[currentIndex].style.filter = "none";
     //Change opacity of the previous and next lyric
     if (previousLyric) {
       lyricElements[currentIndex - 1].style.opacity = "0.2";
+      //blur the previous lyric
+      lyricElements[currentIndex - 1].style.filter = "blur(2px)";
     }
     if (nextLyric) {
       lyricElements[currentIndex + 1].style.opacity = "0.2";
+      //blur the next lyric
+      lyricElements[currentIndex + 1].style.filter = "blur(2px)";
     }
 
     //Set the current lyric to the center of the panel
@@ -390,6 +443,12 @@ function setSyncLyrics(lyrics) {
 //New list of lyrics elements
 let lyricElements = [];
 function generateSyncLyrics() {
+  if (document.getElementById("Lyric-Body")) {
+    //remove all p elements in the lyric panel
+    const lyricPanel = document.querySelector("#Lyric-Body");
+    lyricPanel.innerHTML = "";
+    lyricElements = [];
+  }
   for (let i = 0; i < syncLyrics.length; i++) {
     const lyricPanel = document.querySelector("#Lyric-Body");
     const p = document.createElement("p");
