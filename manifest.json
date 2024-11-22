@@ -3,7 +3,7 @@
   "name": "Youtube Lyrics",
   "version": "1.0",
   "description": "A simple Chrome extension for Youtube.",
-  "permissions": ["activeTab"],
+  "permissions": ["activeTab", "storage"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

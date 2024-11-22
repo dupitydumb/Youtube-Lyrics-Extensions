@@ -4,6 +4,43 @@ let isSyncLyrics = false;
 let artistNameElement = "";
 let delay = 0;
 let hasRun = false;
+let isEnabled = false;
+
+//get the stored data of on/off switch
+chrome.storage.sync.get("isEnabled", function (data) {
+  if (data.isEnabled) {
+    //if the switch is on, run the content script
+    isEnabled = true;
+  } else {
+    isEnabled = false;
+  }
+});
+
+//add event listener to the storage
+chrome.storage.onChanged.addListener(function (changes, namespace) {
+  for (let [key, { oldValue, newValue }] of Object.entries(changes)) {
+    if (key === "isEnabled") {
+      if (newValue) {
+        isEnabled = true;
+        //refresh the page
+        location.reload();
+      } else {
+        isEnabled = false;
+        location.reload();
+      }
+    }
+  }
+});
+
+//get color settings from the storage
+chrome.storage.sync.get(["backgroundColor", "textColor"], function (data) {
+  if (data.backgroundColor) {
+  }
+  if (data.textColor) {
+    document.body.style.color = data.textColor;
+  }
+});
+
 window.onload = function () {
   const currentURL = window.location.href;
   // Allow the extension to run only on YouTube video URLs
@@ -39,6 +76,9 @@ window.onload = function () {
             ? videoTitleElement.textContent + " |" + artistNameElement
             : "No title found";
           // Extract the video title
+          if (!isEnabled) {
+            return;
+          }
           console.log("Video title:", formattedTitle(videoTitle));
           getLyrics(formattedTitle(videoTitle));
           createNewDiv(itemsDiv);
@@ -289,7 +329,7 @@ function createNewDiv(itemsDiv) {
   title.textContent = `${videoTitle}`;
   title.id = "Lyric-Title";
   title.style.textAlign = "center";
-  title.style.fontSize = "24px";
+  title.style.fontSize = "18px";
   title.style.marginBottom = "16px";
   newDiv.prepend(title);
   // Add the new div to the document body for lyrics
@@ -362,6 +402,7 @@ function createNewDiv(itemsDiv) {
           color: #374151; /* Text color */
           text-align: left; /* Text alignment */
           font-size: 24px; /* Font size */
+          background-color: ${document.body.style.LyricsbackgroundColor}; /* Background color */
         }
         #Lyric-Body {
           max-height: 300px; /* Fixed height */
@@ -370,6 +411,7 @@ function createNewDiv(itemsDiv) {
           background-color: #ffffff; /* White background */
           border-top: 1px solid #e5e7eb; /* Top border */
           font-size: 16px; /* Font size */
+          color: ${document.body.style.Lyricscolor}; /* Text color */
         }
       `;
   document.head.appendChild(style);
@@ -420,6 +462,7 @@ function setSyncLyrics(lyrics) {
     lyricElements.forEach((element) => {
       element.style.opacity = "0.2";
       element.style.filter = "blur(5px)";
+      //set it to the store color
     });
     lyricElements[currentIndex].style.opacity = "1";
     lyricElements[currentIndex].style.filter = "none";
@@ -460,7 +503,6 @@ function generateSyncLyrics() {
     style.textContent = `
             #Lyric-Body p {
                 transition: color 0.5s;
-
             }
             `;
     document.head.appendChild(style);
