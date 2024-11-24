@@ -126,29 +126,34 @@ let hasTryAgain = false;
 let datas = [];
 function getLyrics(title) {
   let url = "https://lrclib.net/api/search?q=" + title;
+  console.log("Trying with title : " + title);
   if (hasTryAgain) {
-    url = "https://lrclib.net/api/search?q=" + title;
+    url = "https://lrclib.net/api/search?q=" + formattedSongTitleOnly(title);
+    console.log(
+      "Trying again with formatted title : " + formattedSongTitleOnly(title)
+    );
   }
   fetch(url)
     .then((response) => response.json())
     .then((data) => {
       console.log(data);
       if (data.length === 0 && !hasTryAgain) {
-        getLyrics(formattedSongTitleOnly(title));
+        console.log(
+          "Data not found, trying again with formatted title :" + title
+        );
         hasTryAgain = true;
+        getLyrics(title);
         return;
       }
       if (data.length > 0) {
         datas = data;
         let selectedData = searchData(artistNameElement);
-        console.log("Data : " + selectedData);
         plainLyrics = selectedData.plainLyrics;
         syncLyrics = parseSyncLyrics(selectedData.syncedLyrics);
-        updateTitle(selectedData.trackName + " - " + selectedData.artistName);
+        updateTitle(selectedData.trackName);
         generateSyncLyrics();
+        displayDataOptions();
         var lyricsTypeSelect = document.querySelector("select");
-        console.log(plainLyrics);
-        console.log(syncLyrics);
         if (syncLyrics.length > 0 && syncLyrics[0] !== null) {
           isSyncLyrics = true;
           //Set the default value to current isSyncLyrics value
@@ -158,8 +163,6 @@ function getLyrics(title) {
           isSyncLyrics = false;
           //Set the default value to current isSyncLyrics value
           lyricsTypeSelect.value = "plain";
-          console.log(syncLyrics[0]);
-          console.log("syncLyrics is empty");
           setLyrics(plainLyrics);
         }
       } else {
@@ -184,6 +187,59 @@ function searchData(artistName) {
     } else {
       return datas[0];
     }
+  }
+}
+
+function displayDataOptions() {
+  const lyricPanel = document.querySelector("#Lyric-Panel");
+  if (lyricPanel) {
+    if (document.getElementById("Data-Options")) {
+      //clear the data options container
+      document.getElementById("Data-Options").remove();
+    }
+    // Create a container for the data options
+    const dataOptionsContainer = document.createElement("div");
+    dataOptionsContainer.id = "Data-Options";
+    dataOptionsContainer.className =
+      "mt-6 p-6 bg-gray-100 rounded-lg shadow-md flex";
+
+    // Create a label for the data options
+    const dataOptionsLabel = document.createElement("span");
+    dataOptionsLabel.textContent = "Other available lyrics:";
+    dataOptionsLabel.className = "block mb-2 text-sm font-medium text-gray-700";
+    dataOptionsContainer.appendChild(dataOptionsLabel);
+
+    // Create a dropdown menu for the data options
+    const dataOptionsSelect = document.createElement("select");
+    dataOptionsSelect.className =
+      "block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm";
+    dataOptionsContainer.appendChild(dataOptionsSelect);
+
+    // Use a Set to track unique trackName and artistName combinations
+    const uniqueTracks = new Set();
+
+    // Add options to the dropdown menu
+    datas.forEach((data, index) => {
+      const trackArtistCombo = `${data.trackName} - ${data.artistName}`;
+      if (!uniqueTracks.has(trackArtistCombo)) {
+        uniqueTracks.add(trackArtistCombo);
+        const option = document.createElement("option");
+        option.value = index;
+        option.textContent = trackArtistCombo;
+        dataOptionsSelect.appendChild(option);
+      }
+    });
+    // Add event listener to the dropdown menu
+    dataOptionsSelect.addEventListener("change", (event) => {
+      const selectedIndex = event.target.value;
+      const selectedData = datas[selectedIndex];
+      plainLyrics = selectedData.plainLyrics;
+      syncLyrics = parseSyncLyrics(selectedData.syncedLyrics);
+      setLyrics(plainLyrics);
+      generateSyncLyrics();
+      updateTitle(selectedData.trackName);
+    });
+    document.querySelector("#Setting-Panel").appendChild(dataOptionsContainer);
   }
 }
 
@@ -212,16 +268,36 @@ function formattedTitle(title) {
   if (formattedTitle.includes("|") && formattedTitle.includes("-")) {
     formattedTitle = formattedTitle.split("|")[0];
   }
-  console.log("Formatted title:", formattedTitle);
   return formattedTitle;
 }
 
 function formattedSongTitleOnly(title) {
-  //if title has a dash remove the text before the dash
-  if (title.includes("-")) {
-    title = title.split("-")[1];
+  notallowed = [
+    "MV",
+    "M/V",
+    "Official",
+    "Video",
+    "Lyric",
+    "Music",
+    "Audio",
+    "Live",
+    "clip",
+    "'",
+  ];
+  //if it not alpabet, remove it
+
+  let formattedTitle = title.toLowerCase().split(" ");
+  formattedTitle = formattedTitle
+    .filter(
+      (word) => !notallowed.includes(word) && !/[\uAC00-\uD7AF]/.test(word)
+    )
+    .join(" ");
+  //if formatted tittle has |, split the title and get the first part
+  if (formattedTitle.includes("|")) {
+    formattedTitle = formattedTitle.split("|")[0];
   }
-  return title;
+
+  return formattedTitle;
 }
 let isVideoPlaying = false;
 function startSyncLyrics() {
@@ -263,7 +339,7 @@ function startSyncLyrics() {
   document.head.appendChild(style);
   function updateLyrics() {
     console.log("Checking for current lyric");
-    const currentTime = getCurrentVideoTime() + delay;
+    const currentTime = getCurrentVideoTime() + -delay;
     if (currentTime !== null) {
       const currentLyric = syncLyrics.find(
         (lyric) => lyric.time <= currentTime && lyric.time + 2 >= currentTime
@@ -339,6 +415,7 @@ function createNewDiv(itemsDiv) {
   // Add delay control panel
   const secondaryInner = document.querySelector("#secondary-inner");
   const settingPanel = document.createElement("div");
+  settingPanel.id = "Setting-Panel";
   settingPanel.className =
     "mt-2 p-2 bg-gray-100 rounded-lg shadow-md flex flex-col items-left";
   //

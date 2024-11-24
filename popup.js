@@ -20,9 +20,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (isEnabled) {
       chrome.action.setBadgeText({ text: "ON" });
       //reload the page
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        chrome.tabs.reload(tabs[0].id);
-      });
     } else {
       chrome.action.setBadgeText({ text: "" });
       //reload the page
