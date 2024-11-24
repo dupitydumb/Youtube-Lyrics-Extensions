@@ -147,12 +147,12 @@ function getLyrics(title) {
       }
       if (data.length > 0) {
         datas = data;
+        displayDataOptions();
         let selectedData = searchData(artistNameElement);
         plainLyrics = selectedData.plainLyrics;
         syncLyrics = parseSyncLyrics(selectedData.syncedLyrics);
         updateTitle(selectedData.trackName);
         generateSyncLyrics();
-        displayDataOptions();
         var lyricsTypeSelect = document.querySelector("select");
         if (syncLyrics.length > 0 && syncLyrics[0] !== null) {
           isSyncLyrics = true;
@@ -166,6 +166,8 @@ function getLyrics(title) {
           setLyrics(plainLyrics);
         }
       } else {
+        plainLyrics = "I'm sorry, I cannot find the lyrics for this song.";
+        setLyrics(plainLyrics);
       }
     })
     .catch((error) => {
@@ -202,19 +204,18 @@ function displayDataOptions() {
     dataOptionsContainer.id = "Data-Options";
     dataOptionsContainer.className =
       "mt-6 p-6 bg-gray-100 rounded-lg shadow-md flex";
-
+    document.querySelector("#Setting-Panel").appendChild(dataOptionsContainer);
     // Create a label for the data options
     const dataOptionsLabel = document.createElement("span");
-    dataOptionsLabel.textContent = "Other available lyrics:";
-    dataOptionsLabel.className = "block mb-2 text-sm font-medium text-gray-700";
+    dataOptionsLabel.textContent = "Selected Lyrics:";
+    dataOptionsLabel.className = "text-sm font-medium text-gray-700";
     dataOptionsContainer.appendChild(dataOptionsLabel);
 
     // Create a dropdown menu for the data options
     const dataOptionsSelect = document.createElement("select");
     dataOptionsSelect.className =
-      "block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm";
+      "w-full border border-gray-300 rounded-lg p-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm";
     dataOptionsContainer.appendChild(dataOptionsSelect);
-
     // Use a Set to track unique trackName and artistName combinations
     const uniqueTracks = new Set();
 
@@ -239,7 +240,6 @@ function displayDataOptions() {
       generateSyncLyrics();
       updateTitle(selectedData.trackName);
     });
-    document.querySelector("#Setting-Panel").appendChild(dataOptionsContainer);
   }
 }
 
@@ -338,6 +338,9 @@ function startSyncLyrics() {
             `;
   document.head.appendChild(style);
   function updateLyrics() {
+    if (!isSyncLyrics) {
+      return;
+    }
     console.log("Checking for current lyric");
     const currentTime = getCurrentVideoTime() + -delay;
     if (currentTime !== null) {
@@ -404,10 +407,16 @@ function createNewDiv(itemsDiv) {
   const title = document.createElement("h2");
   title.textContent = `${videoTitle}`;
   title.id = "Lyric-Title";
-  title.style.textAlign = "center";
+  title.style.textAlign = "left";
   title.style.fontSize = "18px";
-  title.style.marginBottom = "16px";
+  title.style.marginBottom = "2px";
+  const artistNameDiv = document.createElement("div");
+  artistNameDiv.textContent = artistNameElement;
+  artistNameDiv.style.textAlign = "left";
+  artistNameDiv.style.fontSize = "12px";
+  artistNameDiv.style.marginBottom = "16px";
   newDiv.prepend(title);
+  newDiv.appendChild(artistNameDiv);
   // Add the new div to the document body for lyrics
   const lyricBody = document.createElement("div");
   lyricBody.id = "Lyric-Body";
@@ -417,54 +426,48 @@ function createNewDiv(itemsDiv) {
   const settingPanel = document.createElement("div");
   settingPanel.id = "Setting-Panel";
   settingPanel.className =
-    "mt-2 p-2 bg-gray-100 rounded-lg shadow-md flex flex-col items-left";
-  //
-  //Make setting panell. contains delay control, lyrics type control. and lyrics language control
+    "mt-4 p-4 bg-gray-100 rounded-lg shadow-md flex flex-col space-y-4";
+
+  // Delay control
   const delayPanel = document.createElement("div");
-  delayPanel.className = "flex flex-row items-center";
+  delayPanel.className = "flex flex-row items-center space-x-2";
   const delayLabel = document.createElement("label");
   delayLabel.textContent = "Delay (s):";
-  delayLabel.className = "mr-2";
+  delayLabel.className = "text-sm font-medium text-gray-700";
   const delayInput = document.createElement("input");
   delayInput.type = "number";
   delayInput.value = 0;
   delayInput.min = -200;
   delayInput.max = 200;
   delayInput.className =
-    "border border-gray-300 rounded-lg p-1 focus:outline-none";
+    "border border-gray-300 rounded-lg p-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm";
   delayInput.addEventListener("input", (e) => {
     delay = parseInt(e.target.value);
   });
-  settingPanel.appendChild(delayLabel);
-  settingPanel.appendChild(delayInput);
+  delayPanel.appendChild(delayLabel);
+  delayPanel.appendChild(delayInput);
 
-  //Switch between plain lyrics and sync lyrics
+  // Lyrics type control
   const lyricsTypePanel = document.createElement("div");
-  lyricsTypePanel.className = "flex flex-row items-center";
+  lyricsTypePanel.className = "flex flex-row items-center space-x-2";
   const lyricsTypeLabel = document.createElement("label");
-  lyricsTypeLabel.textContent = "Lyrics Type:";
-  lyricsTypeLabel.className = "mr-2";
-  const lyricsTypeSelect = document.createElement("select");
-  lyricsTypeSelect.className =
-    "border border-gray-300 rounded-lg p-1 focus:outline-none";
-  const plainLyricsOption = document.createElement("option");
-  plainLyricsOption.value = "plain";
-  plainLyricsOption.textContent = "Plain Lyrics";
-  const syncLyricsOption = document.createElement("option");
-  syncLyricsOption.value = "sync";
-  syncLyricsOption.textContent = "Synced Lyrics";
-  lyricsTypeSelect.appendChild(plainLyricsOption);
-  lyricsTypeSelect.appendChild(syncLyricsOption);
-  lyricsTypeSelect.addEventListener("change", (e) => {
-    if (e.target.value === "sync") {
+  lyricsTypeLabel.textContent = "Karaoke Mode:";
+  lyricsTypeLabel.className = "text-sm font-medium text-gray-700";
+  const lyricsTypeSwitch = document.createElement("input");
+  lyricsTypeSwitch.type = "checkbox";
+  lyricsTypeSwitch.className = "toggle-checkbox";
+  lyricsTypeSwitch.checked = true;
+  lyricsTypeSwitch.addEventListener("change", (e) => {
+    if (e.target.checked) {
       isSyncLyrics = true;
+      generateSyncLyrics();
     } else {
       isSyncLyrics = false;
+      setLyrics(plainLyrics);
     }
   });
   lyricsTypePanel.appendChild(lyricsTypeLabel);
-  lyricsTypePanel.appendChild(lyricsTypeSelect);
-  settingPanel.appendChild(lyricsTypePanel);
+  lyricsTypePanel.appendChild(lyricsTypeSwitch);
   secondaryInner.insertBefore(settingPanel, secondaryInner.childNodes[1]);
   const style = document.createElement("style");
   style.textContent = `
@@ -492,6 +495,17 @@ function createNewDiv(itemsDiv) {
         }
       `;
   document.head.appendChild(style);
+  // Add delay and lyrics type panels to setting panel
+  const controlPanel = document.createElement("div");
+  controlPanel.className = "flex flex-row space-x-4";
+  controlPanel.appendChild(delayPanel);
+  controlPanel.appendChild(lyricsTypePanel);
+  settingPanel.appendChild(controlPanel);
+  const settingPanelUp = document.createElement("div");
+  settingPanelUp.id = "settingPanelUp";
+  settingPanelUp.className = "mt-6 p-6 bg-gray-100 rounded-lg shadow-md flex";
+  settingPanel.appendChild(settingPanelUp);
+  settingPanelUp.appendChild(controlPanel);
 }
 
 function injectTailwindCSS() {
@@ -504,10 +518,10 @@ function injectTailwindCSS() {
 
 function setLyrics(lyrics) {
   const lyricPanel = document.querySelector("#Lyric-Body");
+  //else set the lyrics to the lyric panel
   if (lyricPanel) {
     // Clear existing content
     lyricPanel.innerHTML = "";
-
     // Split lyrics by line breaks and create a new paragraph for each line
     const lines = lyrics.split("\n");
     lines.forEach((line) => {
@@ -515,6 +529,24 @@ function setLyrics(lyrics) {
       p.textContent = line;
       lyricPanel.appendChild(p);
     });
+  }
+  if (!isSyncLyrics) {
+    const style = document.createElement("style");
+    style.textContent = `
+              #Lyric-Body {
+                  font-size: 16px;
+                  margin: 0;
+                  padding: 8px;
+                  transition: color 0.5s;
+                  text-align: left;
+                  font-weight: normal;
+              }
+              #Lyric-Body p {
+                  margin: 0;
+                  padding: 8px;
+              }
+              `;
+    document.head.appendChild(style);
   }
 }
 
@@ -563,6 +595,24 @@ function setSyncLyrics(lyrics) {
 //New list of lyrics elements
 let lyricElements = [];
 function generateSyncLyrics() {
+  const style = document.createElement("style");
+  style.textContent = `
+            #Lyric-Body {
+                font-size: 26px;
+                font-weight: bold;    
+                margin: 0;
+                padding: 8px;
+                transition: color 0.5s;
+                text-align: center;
+            }
+            #Lyric-Body p {
+                animation: glow 1s ease-in-out infinite alternate;
+                text-shadow: 0px 15px 26px rgba(0,0,0,0.6);
+                margin: 0;
+                padding: 8px;
+            }
+            `;
+  document.head.appendChild(style);
   if (document.getElementById("Lyric-Body")) {
     //remove all p elements in the lyric panel
     const lyricPanel = document.querySelector("#Lyric-Body");
