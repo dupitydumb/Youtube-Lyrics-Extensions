@@ -67,11 +67,6 @@ window.onload = function () {
             "#title > h1 > yt-formatted-string"
           ).innerHTML;
           const artistNameElementNode = document.querySelector("#text > a");
-          if (artistNameElementNode) {
-            artistNameElement = artistNameElementNode.innerHTML;
-          } else {
-            artistNameElement = "Unknown Artist";
-          }
           const videoTitle = videoTitleElement
             ? videoTitleElement.textContent + " |" + artistNameElement
             : "No title found";
@@ -151,7 +146,7 @@ function getLyrics(title) {
         let selectedData = searchData(artistNameElement);
         plainLyrics = selectedData.plainLyrics;
         syncLyrics = parseSyncLyrics(selectedData.syncedLyrics);
-        updateTitle(selectedData.trackName);
+        updateTitle(selectedData.trackName, selectedData.artistName);
         generateSyncLyrics();
         var lyricsTypeSelect = document.querySelector("select");
         if (syncLyrics.length > 0 && syncLyrics[0] !== null) {
@@ -204,7 +199,6 @@ function displayDataOptions() {
     dataOptionsContainer.id = "Data-Options";
     dataOptionsContainer.className =
       "mt-6 p-6 bg-gray-100 rounded-lg shadow-md flex";
-    document.querySelector("#Setting-Panel").appendChild(dataOptionsContainer);
     // Create a label for the data options
     const dataOptionsLabel = document.createElement("span");
     dataOptionsLabel.textContent = "Selected Lyrics:";
@@ -215,7 +209,7 @@ function displayDataOptions() {
     const dataOptionsSelect = document.createElement("select");
     dataOptionsSelect.className =
       "w-full border border-gray-300 rounded-lg p-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm";
-    dataOptionsContainer.appendChild(dataOptionsSelect);
+
     // Use a Set to track unique trackName and artistName combinations
     const uniqueTracks = new Set();
 
@@ -230,6 +224,8 @@ function displayDataOptions() {
         dataOptionsSelect.appendChild(option);
       }
     });
+    document.querySelector("#Setting-Panel").appendChild(dataOptionsContainer);
+    dataOptionsContainer.appendChild(dataOptionsSelect);
     // Add event listener to the dropdown menu
     dataOptionsSelect.addEventListener("change", (event) => {
       const selectedIndex = event.target.value;
@@ -238,7 +234,7 @@ function displayDataOptions() {
       syncLyrics = parseSyncLyrics(selectedData.syncedLyrics);
       setLyrics(plainLyrics);
       generateSyncLyrics();
-      updateTitle(selectedData.trackName);
+      updateTitle(selectedData.trackName, selectedData.artistName);
     });
   }
 }
@@ -282,7 +278,6 @@ function formattedSongTitleOnly(title) {
     "Audio",
     "Live",
     "clip",
-    "'",
   ];
   //if it not alpabet, remove it
 
@@ -296,7 +291,14 @@ function formattedSongTitleOnly(title) {
   if (formattedTitle.includes("|")) {
     formattedTitle = formattedTitle.split("|")[0];
   }
-
+  //if formatted tittle has [] remove the text inside the brackets
+  if (formattedTitle.includes("[")) {
+    formattedTitle = formattedTitle.split("[")[0];
+  }
+  //Remove '' from the formatted title
+  if (formattedTitle.includes("''")) {
+    formattedTitle = formattedTitle.split("''")[0];
+  }
   return formattedTitle;
 }
 let isVideoPlaying = false;
@@ -334,11 +336,32 @@ function startSyncLyrics() {
                 text-shadow: 0px 15px 26px rgba(0,0,0,0.6);
                 margin: 0;
                 padding: 8px;
+                animation-name: shake;
+                animation-duration: 5s;
+                animation-iteration-count: infinite;
+            }
+
+            @keyframes glow {
+              0% {
+                text-shadow: 0px 0px 10px rgba(0,0,0,0.6);
+              }
+              100% {
+                text-shadow: 0px 0px 25px rgba(0,0,0,0.8);
+              }
+            }
+
+            @keyframes shake {
+              0% { transform: translate(1px, 1px) rotate(0deg); }
+              30% { transform: translate(2px, 1px) rotate(0deg); }
+              40% { transform: translate(1px, -1px) rotate(1deg); }
+              70% { transform: translate(2px, 1px) rotate(-1deg); }
+              100% { transform: translate(1px, -2px) rotate(-1deg); }
             }
             `;
   document.head.appendChild(style);
+  let lastIndex = 0;
   function updateLyrics() {
-    if (!isSyncLyrics) {
+    if (!isSyncLyrics || datas.length === 0) {
       return;
     }
     console.log("Checking for current lyric");
@@ -352,14 +375,6 @@ function startSyncLyrics() {
         console.log("Setting current lyric to", currentLyric.text);
         setSyncLyrics(currentLyric.text);
       } else {
-        //if the currentLyric is not found, set current lyric to the closest lyric with time less than current time
-        // const closestLyric = syncLyrics.reduce((a, b) =>
-        //   Math.abs(b.time - currentTime) < Math.abs(a.time - currentTime)
-        //     ? b
-        //     : a
-        // );
-        // console.log("Setting current lyric to", closestLyric.text);
-        // setSyncLyrics(closestLyric.text);
       }
     }
   }
@@ -374,16 +389,21 @@ function parseSyncLyrics(syncedLyrics) {
         const timeParts = match[1].split(":");
         const timeInSeconds =
           parseInt(timeParts[0]) * 60 + parseFloat(timeParts[1]);
-        return { time: timeInSeconds, text: match[2] };
+        const text = match[2].trim() === "" ? "..." : match[2];
+        return { time: timeInSeconds, text: text };
       }
       return null;
     })
     .filter((line) => line !== null);
 }
-function updateTitle(title) {
+function updateTitle(title, artistName) {
   const titleElement = document.querySelector("#Lyric-Title");
   if (titleElement) {
     titleElement.textContent = title;
+  }
+  const artistNameElement = document.querySelector("#Lyric-Artist-Name");
+  if (artistNameElement) {
+    artistNameElement.textContent = artistName;
   }
 }
 
@@ -407,10 +427,12 @@ function createNewDiv(itemsDiv) {
   const title = document.createElement("h2");
   title.textContent = `${videoTitle}`;
   title.id = "Lyric-Title";
+  title.style.fontWeight = "bold";
   title.style.textAlign = "left";
   title.style.fontSize = "18px";
   title.style.marginBottom = "2px";
   const artistNameDiv = document.createElement("div");
+  artistNameDiv.id = "Lyric-Artist-Name";
   artistNameDiv.textContent = artistNameElement;
   artistNameDiv.style.textAlign = "left";
   artistNameDiv.style.fontSize = "12px";
@@ -610,6 +632,26 @@ function generateSyncLyrics() {
                 text-shadow: 0px 15px 26px rgba(0,0,0,0.6);
                 margin: 0;
                 padding: 8px;
+                animation-name: shake;
+                animation-duration: 2s;
+                animation-iteration-count: infinite;
+            }
+
+            @keyframes glow {
+              0% {
+                text-shadow: 0px 0px 10px rgba(0,0,0,0.6);
+              }
+              100% {
+                text-shadow: 0px 0px 25px rgba(0,0,0,0.8);
+              }
+            }
+
+            @keyframes shake {
+              0% { transform: translate(1px, 1px) rotate(0deg); }
+              30% { transform: translate(2px, 1px) rotate(0deg); }
+              40% { transform: translate(1px, -1px) rotate(1deg); }
+              70% { transform: translate(2px, 1px) rotate(-1deg); }
+              100% { transform: translate(1px, -2px) rotate(-1deg); }
             }
             `;
   document.head.appendChild(style);
@@ -623,6 +665,10 @@ function generateSyncLyrics() {
     const lyricPanel = document.querySelector("#Lyric-Body");
     const p = document.createElement("p");
     p.textContent = syncLyrics[i].text;
+    if (p.textContent === "") {
+      //remove the empty lyric
+      p.remove();
+    }
     lyricPanel.appendChild(p);
     lyricElements.push(p);
     //create style for the lyric elements
