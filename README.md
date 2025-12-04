@@ -9,18 +9,14 @@ A Chrome extension that displays synchronized lyrics for YouTube videos with a b
 ## 📸 Screenshots
 
 <!-- Add screenshots here -->
-![Feature Showcase 1](path/to/screenshot1.png)
-*Description of feature*
+![Screenshots 1](https://github.com/user-attachments/assets/49c36cd7-4bb7-4252-abb9-54c616d3c089)
 
-![Feature Showcase 2](path/to/screenshot2.png)
-*Description of feature*
 
-![Fullscreen Mode](path/to/fullscreen.png)
+![Fullscreen Mode](https://github.com/user-attachments/assets/21bfcfeb-a11f-45e7-a03f-66581e1980bc)
 *Lyrics seamlessly integrated in fullscreen mode*
 
 ---
 
-<img width="1339" height="639" alt="image" src="https://github.com/user-attachments/assets/9fb6100b-8520-4105-a388-373c64408a77" />
 
 
 ## ✨ Features
@@ -136,16 +132,7 @@ A Chrome extension that displays synchronized lyrics for YouTube videos with a b
 - Try disabling other YouTube extensions temporarily
 
 ## 🔄 Updates & Changelog
-
-See [CHANGELOG-V2.md](CHANGELOG-V2.md) for detailed version history and improvements.
-
-### Version 2.0 Highlights
-- ✅ Complete UI redesign with modern, clean interface
-- ✅ Fullscreen mode support for immersive viewing experience
-- ✅ Critical bug fixes in search and sync functions
-- ✅ Performance optimizations with binary search
-- ✅ Interactive lyric seeking
-- ✅ Enhanced visual effects and animations
+- Added Fullscreen
 
 ## 📄 License
 
