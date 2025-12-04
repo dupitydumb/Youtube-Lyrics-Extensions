@@ -6,7 +6,8 @@
 
 A Chrome extension that displays synchronized lyrics for YouTube videos with a beautiful Apple Music-style interface.
 
-![Extension Preview](https://github.com/user-attachments/assets/5aa09b26-50e2-44b8-bf88-8416e16dd373)
+<img width="1339" height="639" alt="image" src="https://github.com/user-attachments/assets/9fb6100b-8520-4105-a388-373c64408a77" />
+
 
 ## ✨ Features
 
