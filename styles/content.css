@@ -797,3 +797,198 @@
     padding: 0.625rem 0.375rem;
   }
 }
+
+/* ==================== FULLSCREEN KARAOKE MODE ==================== */
+.lyrics-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.lyrics-fullscreen-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: rgba(0, 0, 0, 0.92);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+
+.lyrics-fullscreen-display {
+  position: relative;
+  z-index: 1;
+  width: 90vw;
+  max-width: 1200px;
+  height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1rem, 2vw, 2rem);
+  overflow: hidden;
+  padding: 2rem;
+}
+
+/* Fullscreen lyric lines */
+.lyrics-fullscreen-display .lyric-line {
+  padding: clamp(0.75rem, 1.5vw, 1.5rem) 2rem;
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(1);
+  max-width: 100%;
+  margin: 0;
+  opacity: 1;
+  text-align: center;
+  width: auto;
+}
+
+.lyrics-fullscreen-display .lyric-line:hover {
+  color: rgba(255, 255, 255, 0.65);
+  transform: scale(1.03);
+}
+
+.lyrics-fullscreen-display .lyric-line.current {
+  color: #ffffff;
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  transform: scale(1);
+  text-shadow: 
+    0 0 20px rgba(255, 255, 255, 0.4),
+    0 0 40px rgba(255, 255, 255, 0.2),
+    0 4px 30px rgba(0, 0, 0, 0.5);
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: lyric-glow 2s ease-in-out infinite;
+}
+
+@keyframes lyric-glow {
+  0%, 100% {
+    text-shadow: 
+      0 0 20px rgba(255, 255, 255, 0.4),
+      0 0 40px rgba(255, 255, 255, 0.2),
+      0 4px 30px rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    text-shadow: 
+      0 0 30px rgba(255, 255, 255, 0.6),
+      0 0 60px rgba(255, 255, 255, 0.3),
+      0 4px 40px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.lyrics-fullscreen-display .lyric-line.past {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: clamp(1rem, 2.5vw, 1.75rem);
+  transform: scale(0.95);
+}
+
+.lyrics-fullscreen-display .lyric-line.future {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: clamp(1.125rem, 2.75vw, 2rem);
+  transform: scale(0.98);
+}
+
+/* Exit hint */
+.lyrics-fullscreen-hint {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0.75rem 1.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 2rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+  animation: hint-fade-in-out 4s ease-in-out infinite;
+}
+
+.lyrics-fullscreen-hint:hover {
+  opacity: 1;
+}
+
+.lyrics-fullscreen-hint kbd {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.25rem;
+  font-family: monospace;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0 0.25rem;
+}
+
+@keyframes hint-fade-in-out {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Fullscreen button styling */
+.lyrics-button-fullscreen {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+  border: 1px solid rgba(102, 126, 234, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lyrics-button-fullscreen:hover {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+  border-color: rgba(102, 126, 234, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+}
+
+.lyrics-button-fullscreen.active {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%);
+  border-color: rgba(102, 126, 234, 0.8);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+}
+
+/* Responsive fullscreen adjustments */
+@media (max-width: 768px) {
+  .lyrics-fullscreen-display {
+    width: 95vw;
+    padding: 1rem;
+  }
+  
+  .lyrics-fullscreen-display .lyric-line.current {
+    font-size: clamp(1.5rem, 6vw, 3rem);
+  }
+  
+  .lyrics-fullscreen-hint {
+    bottom: 1rem;
+    font-size: 0.75rem;
+    padding: 0.5rem 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lyrics-fullscreen-overlay,
+  .lyrics-fullscreen-display .lyric-line {
+    transition: none !important;
+    animation: none !important;
+  }
+}
