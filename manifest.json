@@ -7,19 +7,25 @@
   "host_permissions": ["https://lrclib.net/*"],
   "action": {
     "default_popup": "popup.html",
-    "default_icon": "images/icon.png"
+    "default_icon": {
+      "16": "images/favicon-16x16.png",
+      "32": "images/favicon-32x32.png",
+      "96": "images/favicon-96x96.png"
+    }
   },
   "icons": {
-    "16": "images/icon.png",
-    "48": "images/icon.png",
-    "128": "images/icon.png"
+    "16": "images/favicon-16x16.png",
+    "32": "images/favicon-32x32.png",
+    "48": "images/favicon-32x32.png",
+    "96": "images/favicon-96x96.png",
+    "128": "images/favicon-96x96.png"
   },
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/watch*"],
+      "matches": ["*://*.youtube.com/*"],
       "js": ["content-v2.js"],
       "run_at": "document_end"
     }

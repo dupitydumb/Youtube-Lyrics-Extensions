@@ -130,6 +130,76 @@
 }
 
 /* ==================== CONTROLS TOGGLE BUTTON ==================== */
+/* Video Player Toggle Switch - Panel Show/Hide */
+#lyrics-video-toggle-btn {
+    --toggle-width: 44px;
+    --toggle-height: 24px;
+    --knob-size: 20px;
+    position: relative;
+    display: inline-block;
+    width: var(--toggle-width);
+    height: var(--toggle-height);
+    padding: 0;
+    margin: 0;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    vertical-align: middle;
+    transition: background 150ms linear, border-color 150ms linear, box-shadow 150ms linear;
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: content-box;
+}
+
+/* knob */
+#lyrics-video-toggle-btn::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 2px;
+    transform: translateY(-50%);
+    width: var(--knob-size);
+    height: var(--knob-size);
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+    transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms linear, background 150ms linear;
+    will-change: transform;
+}
+
+/* hover / focus states */
+#lyrics-video-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+#lyrics-video-toggle-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.12);
+    border-color: rgba(102, 126, 234, 0.5);
+}
+
+/* active / checked state — move knob to right and tint track */
+#lyrics-video-toggle-btn.active {
+    background: rgba(102, 126, 234, 0.95);
+    border-color: rgba(102, 126, 234, 0.9);
+}
+
+#lyrics-video-toggle-btn.active::after {
+    transform: translate(calc(var(--toggle-width) - var(--knob-size) - 2px), -50%);
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.35);
+}
+
+/* respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    #lyrics-video-toggle-btn,
+    #lyrics-video-toggle-btn::after {
+        transition: none !important;
+    }
+}
+
+/* Legacy settings button (kept for compatibility) */
 /* Video Player Button Styling */
 /* YouTube-like toggle switch (dark theme friendly) */
 #lyrics-video-settings-btn {
@@ -258,7 +328,7 @@
 /* ==================== LYRICS STATES ==================== */
 .lyric-line {
   padding: 0.5rem 1.5rem;
-  font-size: 1rem;
+  font-size: var(--lyrics-font-size, 1rem);
   font-weight: 400;
   line-height: 1.6;
   letter-spacing: 0.02em;
@@ -279,7 +349,7 @@
 
 .lyric-line.current {
   color: #ffffff;
-  font-size: 1.5rem;
+  font-size: var(--lyrics-current-font-size, 1.5rem);
   font-weight: 600;
   letter-spacing: -0.02em;
   transform: scale(1);
@@ -294,7 +364,7 @@
 
 .lyric-line.past {
   color: rgba(255, 255, 255, 0.5);
-  font-size: 0.95rem;
+  font-size: var(--lyrics-past-font-size, 0.95rem);
   opacity: 0.7;
 }
 
