@@ -19,9 +19,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/*"],
+      "matches": ["*://*.youtube.com/watch*"],
       "js": ["content-v2.js"],
       "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["styles/content.css"],
+      "matches": ["*://*.youtube.com/*"]
     }
   ],
   "content_security_policy": {
