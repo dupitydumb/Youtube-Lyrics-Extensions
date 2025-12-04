@@ -209,7 +209,17 @@
   // ==================== BACKGROUND UTILITIES ====================
 
   function extractVideoThumbnail() {
-    // Try to get high-quality thumbnail from YouTube metadata
+    // Extract video ID from URL to ensure we get the current video's thumbnail
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoId = urlParams.get('v');
+    
+    if (videoId) {
+      // Directly construct thumbnail URL from current video ID
+      // This ensures we always get the current video's thumbnail, not a cached meta tag
+      return `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+    }
+    
+    // Fallback: Try to get from YouTube metadata
     const metaOgImage = document.querySelector('meta[property="og:image"]');
     if (metaOgImage) {
       let thumbnailUrl = metaOgImage.content;
@@ -218,7 +228,7 @@
       return thumbnailUrl;
     }
     
-    // Fallback: extract from video element
+    // Last fallback: extract from video element
     const video = document.querySelector('video');
     if (video) {
       try {
@@ -980,23 +990,80 @@
   
   function toggleControlsVisibility() {
     state.ui.controlsVisible = !state.ui.controlsVisible;
-    
     const controlsContainer = state.ui.controlsContainer;
-    const toggleBtn = document.getElementById('controls-toggle-btn');
+    const videoBtn = document.getElementById('lyrics-video-settings-btn');
     
-    if (controlsContainer && toggleBtn) {
+    if (controlsContainer) {
       if (state.ui.controlsVisible) {
         controlsContainer.classList.remove('hidden');
-        toggleBtn.textContent = '⚙️ Hide Settings';
-        toggleBtn.classList.remove('collapsed');
+        if (videoBtn) {
+          videoBtn.classList.add('active');
+          videoBtn.setAttribute('aria-pressed', 'true');
+        }
       } else {
         controlsContainer.classList.add('hidden');
-        toggleBtn.textContent = '⚙️ Show Settings';
-        toggleBtn.classList.add('collapsed');
+        if (videoBtn) {
+          videoBtn.classList.remove('active');
+          videoBtn.setAttribute('aria-pressed', 'false');
+        }
       }
     }
     
     saveControlSettings();
+  }
+
+  function createVideoPlayerButton() {
+    // Remove existing button if present
+    const existingBtn = document.getElementById('lyrics-video-settings-btn');
+    if (existingBtn) {
+      existingBtn.remove();
+    }
+
+    // Find YouTube's video controls container
+    const rightControls = document.querySelector('.ytp-right-controls');
+    if (!rightControls) {
+      console.warn('YouTube video controls not found');
+      return;
+    }
+
+    // Create container for button with label
+    const container = document.createElement('div');
+    container.id = 'lyrics-video-settings-container';
+    container.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-right: 8px;';
+
+    // Create label
+    const label = document.createElement('span');
+    label.textContent = '🎵';
+    label.style.cssText = 'font-size: 18px; opacity: 0.9; user-select: none; pointer-events: none;';
+    
+    // Create toggle switch button (styled in CSS)
+    const btn = document.createElement('button');
+    btn.id = 'lyrics-video-settings-btn';
+    btn.setAttribute('aria-label', 'Lyrics Settings');
+    btn.setAttribute('title', 'Lyrics Settings: ' + (state.ui.controlsVisible ? 'ON' : 'OFF'));
+    btn.setAttribute('aria-pressed', state.ui.controlsVisible ? 'true' : 'false');
+    btn.setAttribute('role', 'switch');
+    
+    if (state.ui.controlsVisible) {
+      btn.classList.add('active');
+    }
+    
+    // Add click handler
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleControlsVisibility();
+      // Update tooltip
+      btn.setAttribute('title', 'Lyrics Settings: ' + (state.ui.controlsVisible ? 'ON' : 'OFF'));
+    });
+    
+    // Assemble container
+    container.appendChild(label);
+    container.appendChild(btn);
+    
+    // Insert at the beginning of right controls (before settings gear)
+    rightControls.insertBefore(container, rightControls.firstChild);
+    
+    console.log('Lyrics settings button added to video controls');
   }
   
   function createPanel(parentElement) {
@@ -1044,6 +1111,9 @@
     
     state.ui.container.appendChild(state.ui.panel);
     parentElement.insertBefore(state.ui.container, parentElement.firstChild);
+    
+    // Add settings button to video player controls
+    createVideoPlayerButton();
   }
 
   function createHeader() {
@@ -1065,18 +1135,7 @@
     titleContainer.appendChild(title);
     titleContainer.appendChild(artist);
     
-    // Add toggle button
-    const toggleBtn = document.createElement('button');
-    toggleBtn.id = 'controls-toggle-btn';
-    toggleBtn.className = 'controls-toggle-btn';
-    toggleBtn.textContent = state.ui.controlsVisible ? '⚙️ Hide Settings' : '⚙️ Show Settings';
-    if (!state.ui.controlsVisible) {
-      toggleBtn.classList.add('collapsed');
-    }
-    toggleBtn.addEventListener('click', toggleControlsVisibility);
-    
     header.appendChild(titleContainer);
-    header.appendChild(toggleBtn);
     
     return header;
   }
@@ -1619,6 +1678,12 @@
     state.syncedLyrics = [];
     state.sync.handlePlay = null;
     state.sync.handlePause = null;
+    
+    // Remove video player button container
+    const videoContainer = document.getElementById('lyrics-video-settings-container');
+    if (videoContainer) {
+      videoContainer.remove();
+    }
     
     // Remove UI
     removePanel();
