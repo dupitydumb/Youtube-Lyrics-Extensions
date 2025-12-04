@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8">
     <title>YouTube Lyrics</title>
     <style>
       * {
@@ -10,58 +11,90 @@
       }
 
       body {
-        width: 320px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background: #1a1a1a;
+        width: 380px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+        background: #0f0f0f;
         color: #fff;
+        -webkit-font-smoothing: antialiased;
       }
 
       .header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 20px;
-        text-align: center;
+        padding: 24px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       }
 
-      .header h1 {
+      .header-icon {
+        width: 40px;
+        height: 40px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(10px);
+      }
+
+      .header-icon img {
+        width: 28px;
+        height: 28px;
+      }
+
+      .header-text h1 {
         font-size: 18px;
-        font-weight: 600;
-        margin-bottom: 4px;
+        font-weight: 700;
+        margin-bottom: 2px;
+        letter-spacing: -0.3px;
       }
 
-      .header p {
+      .header-text p {
         font-size: 12px;
-        opacity: 0.9;
+        opacity: 0.85;
+        font-weight: 400;
       }
 
       .content {
         padding: 20px;
       }
 
-      .toggle-section {
-        background: #2a2a2a;
+      .section {
+        background: #1a1a1a;
         border-radius: 12px;
         padding: 16px;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
       }
 
-      .toggle-row {
+      .section-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 8px;
+        margin-bottom: 12px;
       }
 
-      .toggle-label {
+      .section-title {
         font-size: 14px;
-        font-weight: 500;
+        font-weight: 600;
+        color: #fff;
+      }
+
+      .section-desc {
+        font-size: 12px;
+        color: #888;
+        line-height: 1.4;
+        margin-bottom: 12px;
       }
 
       .status {
-        font-size: 11px;
-        padding: 4px 10px;
-        border-radius: 10px;
-        font-weight: 600;
+        font-size: 10px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-weight: 700;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
 
       .status.active {
@@ -70,21 +103,17 @@
       }
 
       .status.inactive {
-        background: #555;
-        color: #aaa;
-      }
-
-      .toggle-desc {
-        font-size: 12px;
-        color: #aaa;
-        margin-bottom: 12px;
+        background: #333;
+        color: #888;
       }
 
       /* Toggle Switch */
       .switch {
         position: relative;
-        width: 48px;
-        height: 26px;
+        width: 52px;
+        height: 28px;
+        display: inline-block;
+        vertical-align: middle;
       }
 
       .switch input {
@@ -100,112 +129,272 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: #555;
-        border-radius: 26px;
-        transition: 0.3s;
+        background: #333;
+        border-radius: 28px;
+        transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
       }
 
       .slider:before {
         content: "";
         position: absolute;
-        height: 20px;
-        width: 20px;
+        height: 22px;
+        width: 22px;
         left: 3px;
         bottom: 3px;
         background: white;
         border-radius: 50%;
-        transition: 0.3s;
+        transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
       }
 
       input:checked + .slider {
-        background: #22c55e;
+        background: linear-gradient(135deg, #667eea, #764ba2);
       }
 
       input:checked + .slider:before {
-        transform: translateX(22px);
+        transform: translateX(24px);
+      }
+
+      input:focus + .slider {
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2);
+      }
+
+      /* Font Size Control */
+      .font-size-control {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .font-size-label {
+        font-size: 13px;
+        color: #ccc;
+        min-width: 70px;
+      }
+
+      .font-size-slider {
+        flex: 1;
+        height: 6px;
+        border-radius: 3px;
+        background: #333;
+        outline: none;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+
+      .font-size-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        transition: transform 0.2s;
+      }
+
+      .font-size-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+      }
+
+      .font-size-slider::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .font-size-value {
+        font-size: 13px;
+        font-weight: 600;
+        color: #667eea;
+        min-width: 45px;
+        text-align: right;
+      }
+
+      /* Background Mode Grid */
+      .background-mode-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+
+      .bg-mode-btn {
+        background: #222;
+        border: 2px solid #333;
+        border-radius: 8px;
+        padding: 12px 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        outline: none;
+      }
+
+      .bg-mode-btn .mode-icon {
+        font-size: 20px;
+      }
+
+      .bg-mode-btn .mode-label {
+        font-size: 11px;
+        font-weight: 500;
+        color: #999;
+      }
+
+      .bg-mode-btn:hover {
+        background: #2a2a2a;
+        border-color: #444;
+      }
+
+      .bg-mode-btn.active {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+        border-color: #667eea;
+      }
+
+      .bg-mode-btn.active .mode-label {
+        color: #667eea;
+      }
+
+      /* Theme Select */
+      .theme-select {
+        flex: 1;
+        background: #222;
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 6px 10px;
+        color: #fff;
+        font-size: 12px;
+        outline: none;
+        cursor: pointer;
+      }
+
+      .theme-select:focus {
+        border-color: #667eea;
+      }
+
+      /* Playback Mode Grid */
+      .playback-mode-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+
+      .playback-mode-btn {
+        background: #222;
+        border: 2px solid #333;
+        border-radius: 8px;
+        padding: 12px 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        outline: none;
+      }
+
+      .playback-mode-btn .mode-icon {
+        font-size: 20px;
+      }
+
+      .playback-mode-btn .mode-label {
+        font-size: 11px;
+        font-weight: 500;
+        color: #999;
+      }
+
+      .playback-mode-btn:hover {
+        background: #2a2a2a;
+        border-color: #444;
+      }
+
+      .playback-mode-btn.active {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+        border-color: #667eea;
+      }
+
+      .playback-mode-btn.active .mode-label {
+        color: #667eea;
       }
 
       .info {
-        background: #2a2a2a;
+        background: #1a1a1a;
         border-radius: 12px;
-        padding: 16px;
-        font-size: 13px;
+        padding: 14px;
+        font-size: 12px;
         line-height: 1.6;
-        color: #ccc;
+        color: #888;
+        border: 1px solid rgba(255, 255, 255, 0.06);
       }
 
-      .info strong {
+      .info-title {
         color: #fff;
-        display: block;
-        margin-bottom: 8px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .info-title::before {
+        content: "💡";
+        font-size: 14px;
       }
 
       .footer {
         text-align: center;
         padding: 16px;
         font-size: 11px;
-        color: #666;
+        color: #555;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .footer a {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      .footer a:hover {
+        text-decoration: underline;
+      }
+
+      .sr-only {
+        position: absolute !important;
+        height: 1px;
+        width: 1px;
+        overflow: hidden;
+        clip: rect(1px, 1px, 1px, 1px);
+        white-space: nowrap;
       }
     </style>
   </head>
   <body>
     <div class="header">
-      <h1>YouTube Lyrics</h1>
-      <p>Synchronized lyrics display</p>
+      <div class="header-icon">
+        <img src="images/favicon-96x96.png" alt="YouTube Lyrics Icon">
+      </div>
+      <div class="header-text">
+        <h1>YouTube Lyrics</h1>
+        <p>Synchronized lyrics display</p>
+      </div>
     </div>
 
     <div class="content">
-      <div class="toggle-section">
-        <div class="toggle-row">
-          <span class="toggle-label">Enable Lyrics</span>
+      <!-- Enable/Disable Section -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Enable Extension</span>
           <span class="status inactive" id="status">OFF</span>
         </div>
-        <p class="toggle-desc">Show synchronized lyrics on YouTube videos</p>
-        <style>
-          /* local enhancements for the toggle */
-          .switch { display: inline-block; vertical-align: middle; }
-          .switch .slider {
-            background: linear-gradient(90deg,#444,#666);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
-          }
-          .switch .slider:before {
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-          }
-
-          /* ON/OFF labels inside the switch */
-          .switch .slider:after {
-            content: "OFF";
-            position: absolute;
-            top: 50%;
-            right: 8px;
-            transform: translateY(-50%);
-            font-size: 10px;
-            color: rgba(255,255,255,0.9);
-            font-weight: 700;
-            pointer-events: none;
-            transition: 0.3s;
-          }
-          .switch input:checked + .slider:after {
-            content: "ON";
-            left: 8px;
-            right: auto;
-          }
-
-          /* focus/keyboard accessibility */
-          .switch input:focus + .slider {
-            box-shadow: 0 0 0 4px rgba(102,126,234,0.18);
-          }
-
-          /* visually hidden text helper */
-          .sr-only {
-            position: absolute !important;
-            height: 1px; width: 1px;
-            overflow: hidden;
-            clip: rect(1px, 1px, 1px, 1px);
-            white-space: nowrap;
-          }
-        </style>
-
+        <p class="section-desc">Show synchronized lyrics on YouTube videos</p>
         <label class="switch" title="Toggle lyrics">
           <input type="checkbox" id="toggle-switch" aria-label="Enable lyrics" />
           <span class="slider" role="presentation"></span>
@@ -213,15 +402,123 @@
         </label>
       </div>
 
+      <!-- Font Size Section -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Font Size</span>
+        </div>
+        <p class="section-desc">Adjust the size of lyrics text</p>
+        <div class="font-size-control">
+          <span class="font-size-label">Size:</span>
+          <input 
+            type="range" 
+            id="font-size-slider" 
+            class="font-size-slider"
+            min="12" 
+            max="24" 
+            step="1" 
+            value="16"
+            aria-label="Font size"
+          />
+          <span class="font-size-value" id="font-size-value">16px</span>
+        </div>
+      </div>
+
+      <!-- Background Mode Section -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Background Style</span>
+        </div>
+        <p class="section-desc">Choose the panel background appearance</p>
+        <div class="background-mode-grid" id="background-mode-grid">
+          <button class="bg-mode-btn" data-mode="none">
+            <span class="mode-icon">⬛</span>
+            <span class="mode-label">None</span>
+          </button>
+          <button class="bg-mode-btn" data-mode="gradient">
+            <span class="mode-icon">🎨</span>
+            <span class="mode-label">Gradient</span>
+          </button>
+          <button class="bg-mode-btn active" data-mode="album">
+            <span class="mode-icon">🖼️</span>
+            <span class="mode-label">Album</span>
+          </button>
+          <button class="bg-mode-btn" data-mode="video">
+            <span class="mode-icon">🎬</span>
+            <span class="mode-label">Video</span>
+          </button>
+        </div>
+        
+        <!-- Gradient Theme (conditional) -->
+        <div class="gradient-theme-section" id="gradient-theme-section" style="display: none;">
+          <div class="font-size-control" style="margin-top: 12px;">
+            <span class="font-size-label">Theme:</span>
+            <select id="gradient-theme-select" class="theme-select">
+              <option value="random">🎲 Random</option>
+              <option value="Sunset">Sunset</option>
+              <option value="Ocean">Ocean</option>
+              <option value="Forest">Forest</option>
+              <option value="Fire">Fire</option>
+              <option value="Purple Dream">Purple Dream</option>
+              <option value="Cool Blues">Cool Blues</option>
+              <option value="Warm Sunset">Warm Sunset</option>
+              <option value="Northern Lights">Northern Lights</option>
+              <option value="Peach">Peach</option>
+              <option value="Neon">Neon</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Playback Mode Section -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Playback Mode</span>
+        </div>
+        <p class="section-desc">Choose how lyrics are displayed</p>
+        <div class="playback-mode-grid">
+          <button class="playback-mode-btn active" data-mode="synced">
+            <span class="mode-icon">🎵</span>
+            <span class="mode-label">Synced</span>
+          </button>
+          <button class="playback-mode-btn" data-mode="plain">
+            <span class="mode-icon">📄</span>
+            <span class="mode-label">Plain Text</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sync Offset Section -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Sync Offset</span>
+        </div>
+        <p class="section-desc">Adjust timing if lyrics are out of sync</p>
+        <div class="font-size-control">
+          <span class="font-size-label">Offset:</span>
+          <input 
+            type="range" 
+            id="sync-offset-slider" 
+            class="font-size-slider"
+            min="-1000" 
+            max="1000" 
+            step="50" 
+            value="0"
+            aria-label="Sync offset"
+          />
+          <span class="font-size-value" id="sync-offset-value">0ms</span>
+        </div>
+      </div>
+
+      <!-- Info Section -->
       <div class="info">
-        <strong>How to use:</strong>
-        Open any YouTube music video and lyrics will appear automatically. 
-        Click on any lyric line to jump to that timestamp.
+        <div class="info-title">How to use</div>
+        Open any YouTube music video and lyrics will appear automatically. Click on any lyric line to jump to that timestamp. Use the settings button in the video player to customize.
       </div>
     </div>
 
     <div class="footer">
-      v2.0  Made with love
+      v2.0 • Made with ❤️
     </div>
 
     <script src="popup.js"></script>

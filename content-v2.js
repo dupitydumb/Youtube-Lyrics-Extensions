@@ -157,6 +157,8 @@
     currentData: null,
     syncedLyrics: [],
     titleObserver: null,
+    urlCheckInterval: null,
+    fontSize: 16,
     background: {
       mode: 'album', // 'none', 'gradient', 'album', 'video'
       imageUrl: null,
@@ -179,9 +181,7 @@
       panel: null,
       container: null,
       lyricsContainer: null,
-      controlsContainer: null,
-      collapsedSections: {},
-      controlsVisible: false,
+      panelVisible: true,
       fullscreenMode: false,
       fullscreenOverlay: null,
       keyboardHandler: null
@@ -207,6 +207,15 @@
       clearTimeout(timeout);
       timeout = setTimeout(later, wait);
     };
+  }
+
+  function applyFontSize(fontSize) {
+    state.fontSize = fontSize;
+    
+    // Update CSS custom property for dynamic font sizing
+    document.documentElement.style.setProperty('--lyrics-font-size', fontSize + 'px');
+    document.documentElement.style.setProperty('--lyrics-current-font-size', (fontSize * 1.5) + 'px');
+    document.documentElement.style.setProperty('--lyrics-past-font-size', (fontSize * 0.95) + 'px');
   }
 
   // ==================== BACKGROUND UTILITIES ====================
@@ -976,11 +985,11 @@
     const btn = document.getElementById('lyrics-fullscreen-btn');
     if (btn) {
       if (state.ui.fullscreenMode) {
-        btn.innerHTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 20px; height: 20px;"><path d="M14 4h6v6h-2V6h-4V4zM4 14H2V8h2v6zm16-4h2v6h-2v-6zM8 20v-2H4v-2H2v6h6v-2h2z" fill="#667eea"></path></svg>';
+        btn.innerHTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 24px; height: 24px;"><path d="M14 4h6v6h-2V6h-4V4zM4 14H2V8h2v6zm16-4h2v6h-2v-6zM8 20v-2H4v-2H2v6h6v-2h2z" fill="#667eea"></path></svg>';
         btn.setAttribute('title', 'Exit Fullscreen (ESC)');
         btn.style.color = '#667eea';
       } else {
-        btn.innerHTML = '<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="width: 20px; height: 20px;"><polygon fill="#ffffff" points="0.001,437.167 74.823,512 354.337,254.387 257.614,157.664"></polygon><path fill="#ffffff" d="M269.9,143.663l98.428,98.417c34.239,6.143,70.52-2.472,98.869-25.709L295.63,44.804 C272.393,73.153,263.757,109.412,269.9,143.663z"></path><path fill="#ffffff" d="M476.317,35.674c-45.989-45.98-119.466-47.463-167.392-4.734l172.135,172.135 C523.789,155.15,522.306,81.663,476.317,35.674z"></path></svg>';
+        btn.innerHTML = '<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="width: 24px; height: 24px;"><polygon fill="#ffffff" points="0.001,437.167 74.823,512 354.337,254.387 257.614,157.664"></polygon><path fill="#ffffff" d="M269.9,143.663l98.428,98.417c34.239,6.143,70.52-2.472,98.869-25.709L295.63,44.804 C272.393,73.153,263.757,109.412,269.9,143.663z"></path><path fill="#ffffff" d="M476.317,35.674c-45.989-45.98-119.466-47.463-167.392-4.734l172.135,172.135 C523.789,155.15,522.306,81.663,476.317,35.674z"></path></svg>';
         btn.setAttribute('title', 'Fullscreen Karaoke (F)');
         btn.style.color = 'white';
       }
@@ -1239,51 +1248,35 @@
     return { section, content };
   }
   
-  function saveControlSettings() {
-    try {
-      chrome.storage.sync.set({ 
-        collapsedSections: state.ui.collapsedSections,
-        controlsVisible: state.ui.controlsVisible
-      });
-    } catch (error) {
-      console.warn('Failed to save control settings:', error);
-    }
-  }
-  
-  async function loadControlSettings() {
-    try {
-      const data = await chrome.storage.sync.get(['collapsedSections', 'controlsVisible']);
-      state.ui.collapsedSections = data.collapsedSections || {};
-      state.ui.controlsVisible = data.controlsVisible !== undefined ? data.controlsVisible : false;
-    } catch (error) {
-      console.warn('Failed to load control settings:', error);
-      state.ui.collapsedSections = {};
-      state.ui.controlsVisible = false;
-    }
-  }
-  
-  function toggleControlsVisibility() {
-    state.ui.controlsVisible = !state.ui.controlsVisible;
-    const controlsContainer = state.ui.controlsContainer;
-    const videoBtn = document.getElementById('lyrics-video-settings-btn');
+  function togglePanelVisibility() {
+    state.ui.panelVisible = !state.ui.panelVisible;
+    const container = state.ui.container;
+    const videoBtn = document.getElementById('lyrics-video-toggle-btn');
     
-    if (controlsContainer) {
-      if (state.ui.controlsVisible) {
-        controlsContainer.classList.remove('hidden');
+    if (container) {
+      if (state.ui.panelVisible) {
+        container.style.display = 'block';
         if (videoBtn) {
           videoBtn.classList.add('active');
           videoBtn.setAttribute('aria-pressed', 'true');
+          videoBtn.setAttribute('title', 'Hide Lyrics Panel');
         }
       } else {
-        controlsContainer.classList.add('hidden');
+        container.style.display = 'none';
         if (videoBtn) {
           videoBtn.classList.remove('active');
           videoBtn.setAttribute('aria-pressed', 'false');
+          videoBtn.setAttribute('title', 'Show Lyrics Panel');
         }
       }
     }
     
-    saveControlSettings();
+    // Save state
+    try {
+      chrome.storage.sync.set({ panelVisible: state.ui.panelVisible });
+    } catch (error) {
+      console.warn('Failed to save panel visibility:', error);
+    }
   }
 
   function createVideoPlayerButton() {
@@ -1317,8 +1310,8 @@
     fullscreenBtn.setAttribute('aria-label', 'Fullscreen Karaoke');
     fullscreenBtn.setAttribute('title', 'Fullscreen Karaoke (F)');
     fullscreenBtn.setAttribute('data-control-id', 'fullscreen-btn');
-    fullscreenBtn.style.cssText = 'width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none; color: white; opacity: 0.9;';
-    fullscreenBtn.innerHTML = '<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="width: 20px; height: 20px;"><polygon fill="#ffffff" points="0.001,437.167 74.823,512 354.337,254.387 257.614,157.664"></polygon><path fill="#ffffff" d="M269.9,143.663l98.428,98.417c34.239,6.143,70.52-2.472,98.869-25.709L295.63,44.804 C272.393,73.153,263.757,109.412,269.9,143.663z"></path><path fill="#ffffff" d="M476.317,35.674c-45.989-45.98-119.466-47.463-167.392-4.734l172.135,172.135 C523.789,155.15,522.306,81.663,476.317,35.674z"></path></svg>';
+    fullscreenBtn.style.cssText = 'width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none; color: white; opacity: 0.9;';
+    fullscreenBtn.innerHTML = '<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="width: 24px; height: 24px;"><polygon fill="#ffffff" points="0.001,437.167 74.823,512 354.337,254.387 257.614,157.664"></polygon><path fill="#ffffff" d="M269.9,143.663l98.428,98.417c34.239,6.143,70.52-2.472,98.869-25.709L295.63,44.804 C272.393,73.153,263.757,109.412,269.9,143.663z"></path><path fill="#ffffff" d="M476.317,35.674c-45.989-45.98-119.466-47.463-167.392-4.734l172.135,172.135 C523.789,155.15,522.306,81.663,476.317,35.674z"></path></svg>';
     
     fullscreenBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1333,29 +1326,41 @@
       fullscreenBtn.style.opacity = '0.9';
     });
     
-    // Create toggle switch button (styled in CSS)
-    const settingsBtn = document.createElement('button');
-    settingsBtn.id = 'lyrics-video-settings-btn';
-    settingsBtn.setAttribute('aria-label', 'Lyrics Settings');
-    settingsBtn.setAttribute('title', 'Lyrics Settings: ' + (state.ui.controlsVisible ? 'ON' : 'OFF'));
-    settingsBtn.setAttribute('aria-pressed', state.ui.controlsVisible ? 'true' : 'false');
-    settingsBtn.setAttribute('role', 'switch');
+    // Create panel toggle switch (styled like the popup toggle)
+    const toggleBtn = document.createElement('button');
+    toggleBtn.id = 'lyrics-video-toggle-btn';
+    toggleBtn.className = 'ytp-button';
+    toggleBtn.setAttribute('aria-label', 'Toggle Lyrics Panel');
+    toggleBtn.setAttribute('title', state.ui.panelVisible ? 'Hide Lyrics Panel' : 'Show Lyrics Panel');
+    toggleBtn.setAttribute('aria-pressed', state.ui.panelVisible ? 'true' : 'false');
+    toggleBtn.setAttribute('role', 'switch');
+    toggleBtn.style.cssText = 'width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none; padding: 0; margin: 0; position: relative; opacity: 0.9;';
     
-    if (state.ui.controlsVisible) {
-      settingsBtn.classList.add('active');
+    // Create toggle switch inner elements
+    const toggleTrack = document.createElement('div');
+    toggleTrack.style.cssText = 'width: 28px; height: 16px; background: rgba(255, 255, 255, 0.3); border-radius: 8px; position: relative; transition: background 0.2s;';
+    
+    const toggleThumb = document.createElement('div');
+    toggleThumb.style.cssText = 'width: 12px; height: 12px; background: white; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: transform 0.2s;';
+    
+    toggleTrack.appendChild(toggleThumb);
+    toggleBtn.appendChild(toggleTrack);
+    
+    if (state.ui.panelVisible) {
+      toggleTrack.style.background = '#667eea';
+      toggleThumb.style.transform = 'translateX(12px)';
+      toggleBtn.classList.add('active');
     }
     
     // Add click handler
-    settingsBtn.addEventListener('click', (e) => {
+    toggleBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      toggleControlsVisibility();
-      // Update tooltip
-      settingsBtn.setAttribute('title', 'Lyrics Settings: ' + (state.ui.controlsVisible ? 'ON' : 'OFF'));
+      togglePanelVisibility();
     });
     
-    // Assemble container - settings toggle first, then fullscreen
+    // Assemble container - panel toggle first, then fullscreen
     container.appendChild(label);
-    container.appendChild(settingsBtn);
+    container.appendChild(toggleBtn);
     container.appendChild(fullscreenBtn);
     
     // Insert at the beginning of right controls (before settings gear)
@@ -1393,19 +1398,6 @@
     state.ui.lyricsContainer = document.createElement('div');
     state.ui.lyricsContainer.id = 'lyrics-display';
     state.ui.panel.appendChild(state.ui.lyricsContainer);
-    
-    // Controls
-    state.ui.controlsContainer = document.createElement('div');
-    state.ui.controlsContainer.id = 'lyrics-controls';
-    state.ui.controlsContainer.style.position = 'relative';
-    state.ui.controlsContainer.style.zIndex = '2';
-    
-    // Apply initial visibility state
-    if (!state.ui.controlsVisible) {
-      state.ui.controlsContainer.classList.add('hidden');
-    }
-    
-    state.ui.panel.appendChild(state.ui.controlsContainer);
     
     state.ui.container.appendChild(state.ui.panel);
     parentElement.insertBefore(state.ui.container, parentElement.firstChild);
@@ -1835,9 +1827,8 @@
     try {
       showLoading();
       
-      // Load background and control settings first
+      // Load background settings
       await loadBackgroundSettings();
-      await loadControlSettings();
       
       let results = await searchLyrics(videoInfo.formattedTitle);
       
@@ -1872,13 +1863,12 @@
     const synced = parseSyncedLyrics(data.syncedLyrics);
     const plain = data.plainLyrics || CONSTANTS.MESSAGES.NO_LYRICS;
     
-    createModeToggle(synced.length > 0);
-    createBackgroundControl();
-    
-    // Update background after controls are created to ensure proper state
+    // Update background
     setTimeout(() => {
       updateBackground();
     }, 100);
+    
+    // Keep song selector if multiple results (handled in fetchAndDisplayLyrics)
     
     if (synced.length > 0) {
       initSyncedLyrics(synced);
@@ -1912,7 +1902,17 @@
     video.addEventListener('pause', state.sync.handlePause);
     
     startSync();
-    createDelayControl();
+  }
+
+  function handlePlaybackModeChange(mode) {
+    if (!state.currentData) return;
+    
+    if (mode === 'synced' && state.syncedLyrics.length > 0) {
+      initSyncedLyrics(state.syncedLyrics);
+    } else if (mode === 'plain' && state.currentData.plainLyrics) {
+      stopSync();
+      displayPlainLyrics(state.currentData.plainLyrics);
+    }
   }
 
   function initializeLyricsPanel() {
@@ -1928,6 +1928,12 @@
     
     state.currentTitle = videoInfo.rawTitle;
     createPanel(secondaryInner);
+    
+    // Apply initial panel visibility
+    if (!state.ui.panelVisible && state.ui.container) {
+      state.ui.container.style.display = 'none';
+    }
+    
     fetchAndDisplayLyrics(videoInfo);
     
     state.hasRun = true;
@@ -1935,23 +1941,63 @@
   }
 
   function watchForVideoChanges() {
+    let lastUrl = window.location.href;
     let lastTitle = '';
     
+    // Watch for URL changes (for SPA navigation)
+    const handleUrlChange = debounce(() => {
+      const currentUrl = window.location.href;
+      
+      // Check if we navigated to a watch page
+      if (/^https:\/\/www\.youtube\.com\/watch\?v=/.test(currentUrl)) {
+        if (currentUrl !== lastUrl) {
+          lastUrl = currentUrl;
+          console.log('URL changed to video page, initializing...');
+          resetState();
+          setTimeout(() => initializeLyricsPanel(), 500);
+        }
+      } else if (lastUrl.includes('/watch')) {
+        // Navigated away from watch page
+        lastUrl = currentUrl;
+        resetState();
+      }
+    }, 250);
+    
+    // Watch for title changes (for same video updates)
     const handleTitleChange = debounce(() => {
       const titleEl = document.querySelector(CONSTANTS.SELECTORS.VIDEO_TITLE);
       if (titleEl && titleEl.textContent !== lastTitle) {
         lastTitle = titleEl.textContent;
-        resetState();
-        setTimeout(() => initializeLyricsPanel(), 500);
+        if (/^https:\/\/www\.youtube\.com\/watch\?v=/.test(window.location.href)) {
+          resetState();
+          setTimeout(() => initializeLyricsPanel(), 500);
+        }
       }
     }, 250);
     
+    // Create title observer
     state.titleObserver = new MutationObserver(handleTitleChange);
     
     const titleContainer = document.querySelector('#title');
     if (titleContainer) {
       state.titleObserver.observe(titleContainer, { childList: true, subtree: true });
     }
+    
+    // Watch for URL changes using navigation events
+    window.addEventListener('yt-navigate-finish', handleUrlChange);
+    
+    // Fallback: Watch for popstate events
+    window.addEventListener('popstate', handleUrlChange);
+    
+    // Fallback: Poll for URL changes (YouTube SPA navigation)
+    const urlCheckInterval = setInterval(() => {
+      if (window.location.href !== lastUrl) {
+        handleUrlChange();
+      }
+    }, 1000);
+    
+    // Store interval for cleanup
+    state.urlCheckInterval = urlCheckInterval;
   }
 
   function resetState() {
@@ -1973,6 +2019,12 @@
     
     // Stop sync and cancel animation frame
     stopSync();
+    
+    // Clear URL check interval
+    if (state.urlCheckInterval) {
+      clearInterval(state.urlCheckInterval);
+      state.urlCheckInterval = null;
+    }
     
     // Clear background cache to force reload on new video
     state.background.imageUrl = null;
@@ -2000,28 +2052,46 @@
   // ==================== INITIALIZATION ====================
   
   async function initialize() {
-    if (!/^https:\/\/www\.youtube\.com\/watch\?v=/.test(window.location.href)) {
-      return;
-    }
-    
-    // Load settings
-    chrome.storage.sync.get(['isEnabled'], (data) => {
+    // Load settings first
+    chrome.storage.sync.get([
+      'isEnabled', 
+      'fontSize', 
+      'backgroundMode', 
+      'gradientTheme', 
+      'playbackMode', 
+      'syncDelay',
+      'panelVisible'
+    ], (data) => {
       state.isEnabled = data.isEnabled === true;
+      state.fontSize = data.fontSize || 16;
+      state.background.mode = data.backgroundMode || 'album';
+      state.background.gradientTheme = data.gradientTheme || 'random';
+      state.sync.delay = data.syncDelay || 0;
+      state.ui.panelVisible = data.panelVisible !== false; // Default to true
+      
+      // Apply font size
+      applyFontSize(state.fontSize);
       
       if (!state.isEnabled) {
         console.log('Extension is disabled');
         return;
       }
       
-      // Wait for page ready
-      const observer = new MutationObserver((mutations, obs) => {
-        if (initializeLyricsPanel()) {
-          obs.disconnect();
-          watchForVideoChanges();
-        }
-      });
-      
-      observer.observe(document.body, { childList: true, subtree: true });
+      // Check if we're on a watch page
+      if (/^https:\/\/www\.youtube\.com\/watch\?v=/.test(window.location.href)) {
+        // Wait for page ready
+        const observer = new MutationObserver((mutations, obs) => {
+          if (initializeLyricsPanel()) {
+            obs.disconnect();
+            watchForVideoChanges();
+          }
+        });
+        
+        observer.observe(document.body, { childList: true, subtree: true });
+      } else {
+        // Not on a watch page, but set up navigation watcher
+        watchForVideoChanges();
+      }
     });
   }
 
@@ -2030,6 +2100,44 @@
     if (changes.isEnabled) {
       // Reload the page when extension is toggled
       location.reload();
+    }
+    if (changes.fontSize) {
+      applyFontSize(changes.fontSize.newValue);
+    }
+    if (changes.syncDelay) {
+      state.sync.delay = changes.syncDelay.newValue;
+    }
+    if (changes.backgroundMode) {
+      state.background.mode = changes.backgroundMode.newValue;
+      updateBackground();
+    }
+    if (changes.gradientTheme) {
+      state.background.gradientTheme = changes.gradientTheme.newValue;
+      if (state.background.mode === 'gradient') {
+        updateBackground();
+      }
+    }
+    if (changes.playbackMode) {
+      handlePlaybackModeChange(changes.playbackMode.newValue);
+    }
+  });
+
+  // Listen for messages from popup
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'updateFontSize') {
+      applyFontSize(message.fontSize);
+    } else if (message.type === 'updateSyncDelay') {
+      state.sync.delay = message.syncDelay;
+    } else if (message.type === 'updateBackgroundMode') {
+      state.background.mode = message.backgroundMode;
+      updateBackground();
+    } else if (message.type === 'updateGradientTheme') {
+      state.background.gradientTheme = message.gradientTheme;
+      if (state.background.mode === 'gradient') {
+        updateBackground();
+      }
+    } else if (message.type === 'updatePlaybackMode') {
+      handlePlaybackModeChange(message.playbackMode);
     }
   });
 
