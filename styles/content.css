@@ -1,0 +1,321 @@
+/* YouTube Lyrics Extension - Main Styles */
+
+/* ==================== PANEL CONTAINER ==================== */
+#lyrics-panel-container {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin-bottom: 1rem;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  opacity: 1;
+}
+
+/* ==================== MAIN PANEL ==================== */
+#lyrics-panel {
+  background: linear-gradient(135deg, rgba(30, 30, 35, 0.95) 0%, rgba(20, 20, 25, 0.97) 100%);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  padding: 1.5rem;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ==================== HEADER ==================== */
+#lyrics-panel > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#lyrics-title {
+  flex: 1;
+  opacity: 1;
+}
+
+#song-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+#song-artist {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ==================== LYRICS CONTAINER ==================== */
+#lyrics-display {
+  flex: 1;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  padding: 1.5rem 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 400px;
+}
+
+/* ==================== LYRICS STATES ==================== */
+.lyric-line {
+  padding: 0.5rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(1);
+  max-width: 600px;
+  margin: 0;
+  opacity: 1;
+  width: 100%;
+}
+
+.lyric-line:hover {
+  color: rgba(255, 255, 255, 0.75);
+  transform: scale(1.02);
+}
+
+.lyric-line.current {
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  transform: scale(1);
+  text-shadow: 0 2px 20px rgba(255, 255, 255, 0.4);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lyric-line.current:hover {
+  color: #ffffff;
+  transform: scale(1);
+}
+
+.lyric-line.past {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.95rem;
+  opacity: 0.7;
+}
+
+.lyric-line.future {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.95rem;
+  opacity: 0.7;
+}
+
+/* ==================== LOADING & ERROR STATES ==================== */
+.lyrics-loading {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.6);
+  opacity: 1;
+}
+
+.lyrics-error {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(255, 100, 100, 0.9);
+  opacity: 1;
+}
+
+/* ==================== PLAIN LYRICS ==================== */
+.lyrics-plain {
+  white-space: pre-wrap;
+  line-height: 1.8;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.9);
+  padding: 1.5rem;
+  max-width: 600px;
+  margin: 0 auto;
+  opacity: 1;
+}
+
+/* ==================== CONTROLS ==================== */
+#lyrics-controls {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.875rem;
+}
+
+#lyrics-controls label {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* ==================== BUTTONS ==================== */
+#lyrics-controls button,
+.lyrics-button {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#lyrics-controls button:hover,
+.lyrics-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+#lyrics-controls button:active,
+.lyrics-button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ==================== SELECT DROPDOWNS ==================== */
+#lyrics-controls select,
+.lyrics-select {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  padding-right: 2rem;
+}
+
+#lyrics-controls select:hover,
+.lyrics-select:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+#lyrics-controls select option,
+.lyrics-select option {
+  background: #1a1a1a;
+  color: #ffffff;
+}
+
+/* ==================== DELAY CONTROL ==================== */
+#delay-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#delay-control > span:first-child {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+#delay-display {
+  color: #ffffff;
+  min-width: clamp(3.5rem, 10vw, 4.5rem);
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ==================== ANIMATIONS ==================== */
+@keyframes lyrics-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes lyrics-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lyrics-line-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 768px) {
+  #lyrics-panel {
+    padding: clamp(1rem, 4vw, 1.5rem) !important;
+  }
+  
+  #lyrics-display {
+    padding: clamp(1rem, 3vw, 1.25rem) 0 !important;
+  }
+  
+  #lyrics-controls {
+    font-size: 0.8125rem !important;
+  }
+}
+
+/* ==================== ACCESSIBILITY ==================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

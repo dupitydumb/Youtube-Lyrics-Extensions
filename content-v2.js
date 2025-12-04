@@ -6,6 +6,20 @@
 (function() {
   'use strict';
 
+  // ==================== INJECT EXTERNAL CSS ====================
+  
+  function injectCSS() {
+    if (document.getElementById('lyrics-external-styles')) return;
+    
+    const link = document.createElement('link');
+    link.id = 'lyrics-external-styles';
+    link.rel = 'stylesheet';
+    link.href = chrome.runtime.getURL('styles/content.css');
+    document.head.appendChild(link);
+  }
+  
+  injectCSS();
+
   // ==================== CONSTANTS ====================
   
   const CONSTANTS = {
@@ -121,13 +135,16 @@
     currentTitle: '',
     currentData: null,
     syncedLyrics: [],
+    titleObserver: null,
     sync: {
       currentIndex: -1,
       lastKnownIndex: 0,
       delay: 0,
       isPlaying: false,
       videoElement: null,
-      animationFrameId: null
+      animationFrameId: null,
+      handlePlay: null,
+      handlePause: null
     },
     ui: {
       panel: null,
@@ -146,16 +163,30 @@
     return div.innerHTML;
   }
 
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  // Pre-compute Korean characters for performance
+  const KOREAN_CHARS = new Set(
+    Array.from({ length: CONSTANTS.KOREAN_RANGE.END - CONSTANTS.KOREAN_RANGE.START + 1 }, 
+      (_, i) => String.fromCharCode(CONSTANTS.KOREAN_RANGE.START + i))
+  );
+  const NOT_ALLOWED = new Set([...CONSTANTS.FILTER_WORDS.BASIC, ...KOREAN_CHARS]);
+
   function formatTitle(title) {
     if (!title) return '';
     
-    const notAllowed = [...CONSTANTS.FILTER_WORDS.BASIC];
-    for (let i = CONSTANTS.KOREAN_RANGE.START; i <= CONSTANTS.KOREAN_RANGE.END; i++) {
-      notAllowed.push(String.fromCharCode(i));
-    }
-    
     let formatted = title.toLowerCase().split(' ')
-      .filter(word => !notAllowed.includes(word))
+      .filter(word => !NOT_ALLOWED.has(word))
       .join(' ');
     
     if (formatted.includes('|') && formatted.includes('-')) {
@@ -296,7 +327,10 @@
   }
 
   function syncLoop() {
-    if (!state.sync.isPlaying || !state.sync.videoElement) return;
+    if (!state.sync.isPlaying || !state.sync.videoElement) {
+      state.sync.animationFrameId = null;
+      return;
+    }
     
     const currentTime = state.sync.videoElement.currentTime;
     const result = findCurrentLyric(currentTime);
@@ -342,38 +376,13 @@
     const styles = CONSTANTS.UI.APPLE_MUSIC;
     const spacing = CONSTANTS.UI.SPACING;
     
-    // Container with entrance animation
+    // Container - all styles in external CSS
     state.ui.container = document.createElement('div');
     state.ui.container.id = CONSTANTS.UI.PANEL_CONTAINER_ID;
-    Object.assign(state.ui.container.style, {
-      position: 'sticky',
-      top: '0',
-      zIndex: '100',
-      marginBottom: spacing.MD,
-      borderRadius: styles.RADIUS.LG,
-      overflow: 'hidden',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-      opacity: '1'
-    });
     
     // Panel
     state.ui.panel = document.createElement('div');
     state.ui.panel.id = CONSTANTS.UI.PANEL_ID;
-    Object.assign(state.ui.panel.style, {
-      background: styles.BACKGROUND,
-      backdropFilter: `blur(${styles.BACKDROP_BLUR})`,
-      WebkitBackdropFilter: `blur(${styles.BACKDROP_BLUR})`,
-      padding: spacing.LG,
-      color: '#ffffff',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      WebkitFontSmoothing: 'antialiased',
-      MozOsxFontSmoothing: 'grayscale',
-      textRendering: 'optimizeLegibility',
-      maxHeight: styles.MAX_HEIGHT,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: spacing.MD
-    });
     
     // Header
     const header = createHeader();
@@ -382,169 +391,37 @@
     // Lyrics container
     state.ui.lyricsContainer = document.createElement('div');
     state.ui.lyricsContainer.id = 'lyrics-display';
-    Object.assign(state.ui.lyricsContainer.style, {
-      flex: '1',
-      overflowY: 'auto',
-      overflowX: 'hidden',
-      padding: `${spacing.LG} 0`,
-      textAlign: 'center',
-      scrollBehavior: 'smooth',
-      maskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%)',
-      WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%)',
-      willChange: 'scroll-position'
-    });
     state.ui.panel.appendChild(state.ui.lyricsContainer);
     
     // Controls
     state.ui.controlsContainer = document.createElement('div');
     state.ui.controlsContainer.id = 'lyrics-controls';
-    Object.assign(state.ui.controlsContainer.style, {
-      display: 'flex',
-      gap: spacing.SM,
-      flexWrap: 'wrap',
-      paddingTop: spacing.MD,
-      borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-      fontSize: CONSTANTS.UI.TYPOGRAPHY.SIZES.SMALL
-    });
     state.ui.panel.appendChild(state.ui.controlsContainer);
     
     state.ui.container.appendChild(state.ui.panel);
     parentElement.insertBefore(state.ui.container, parentElement.firstChild);
-    
-    // Add global styles
-    addGlobalStyles();
   }
 
   function createHeader() {
-    const typo = CONSTANTS.UI.TYPOGRAPHY;
-    const spacing = CONSTANTS.UI.SPACING;
-    
     const header = document.createElement('div');
-    Object.assign(header.style, {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingBottom: spacing.MD,
-      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
-    });
     
     const titleContainer = document.createElement('div');
     titleContainer.id = 'lyrics-title';
-    Object.assign(titleContainer.style, { 
-      flex: '1',
-      opacity: '1'
-    });
     
     const title = document.createElement('h3');
     title.id = 'song-title';
     title.textContent = 'Lyrics';
-    Object.assign(title.style, {
-      margin: '0',
-      fontSize: typo.SIZES.MEDIUM,
-      fontWeight: typo.WEIGHTS.SEMIBOLD,
-      letterSpacing: typo.LETTER_SPACING.TIGHT,
-      lineHeight: typo.LINE_HEIGHTS.TIGHT,
-      color: '#ffffff'
-    });
     
     const artist = document.createElement('p');
     artist.id = 'song-artist';
     artist.textContent = '';
-    Object.assign(artist.style, {
-      margin: `${spacing.XXS} 0 0 0`,
-      fontSize: typo.SIZES.SMALL,
-      fontWeight: typo.WEIGHTS.REGULAR,
-      letterSpacing: typo.LETTER_SPACING.WIDE,
-      lineHeight: typo.LINE_HEIGHTS.NORMAL,
-      color: 'rgba(255, 255, 255, 0.6)',
-      display: 'none'
-    });
+    artist.style.display = 'none';
     
     titleContainer.appendChild(title);
     titleContainer.appendChild(artist);
     header.appendChild(titleContainer);
     
     return header;
-  }
-
-  function addGlobalStyles() {
-    if (document.getElementById('lyrics-global-styles')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'lyrics-global-styles';
-    style.textContent = `
-      /* Keyframe animations */
-      @keyframes lyrics-panel-enter {
-        from {
-          opacity: 0;
-          transform: translateY(-20px) scale(0.95);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
-      }
-      
-      @keyframes lyrics-fade-in {
-        from {
-          opacity: 0;
-          transform: translateY(-10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      
-      @keyframes lyrics-line-enter {
-        from {
-          opacity: 0;
-          transform: translateX(-20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-      
-      /* Scrollbar styling */
-      #lyrics-display::-webkit-scrollbar {
-        width: 6px;
-      }
-      #lyrics-display::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 3px;
-      }
-      #lyrics-display::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 3px;
-        transition: background 0.2s;
-      }
-      #lyrics-display::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.4);
-      }
-      
-      /* Responsive adjustments */
-      @media (max-width: 768px) {
-        #${CONSTANTS.UI.PANEL_ID} {
-          padding: clamp(1rem, 4vw, 1.5rem) !important;
-        }
-        #lyrics-display {
-          padding: clamp(1rem, 3vw, 1.25rem) 0 !important;
-        }
-        #lyrics-controls {
-          font-size: 0.8125rem !important;
-        }
-      }
-      
-      @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after {
-          animation-duration: 0.01ms !important;
-          transition-duration: 0.01ms !important;
-        }
-      }
-    `;
-    document.head.appendChild(style);
   }
 
   function updateTitle(title, artist = '') {
@@ -561,68 +438,31 @@
   function showLoading() {
     if (!state.ui.lyricsContainer) return;
     
-    const typo = CONSTANTS.UI.TYPOGRAPHY;
-    const spacing = CONSTANTS.UI.SPACING;
-    
     state.ui.lyricsContainer.innerHTML = '';
     const loading = document.createElement('div');
+    loading.className = 'lyrics-loading';
     loading.textContent = CONSTANTS.MESSAGES.LOADING;
-    Object.assign(loading.style, {
-      textAlign: 'center',
-      padding: spacing.XXL,
-      fontSize: typo.SIZES.BASE,
-      fontWeight: typo.WEIGHTS.REGULAR,
-      letterSpacing: typo.LETTER_SPACING.WIDE,
-      color: 'rgba(255, 255, 255, 0.6)',
-      opacity: '1'
-    });
     state.ui.lyricsContainer.appendChild(loading);
   }
 
   function showError(message) {
     if (!state.ui.lyricsContainer) return;
     
-    const typo = CONSTANTS.UI.TYPOGRAPHY;
-    const spacing = CONSTANTS.UI.SPACING;
-    
     state.ui.lyricsContainer.innerHTML = '';
     const error = document.createElement('div');
+    error.className = 'lyrics-error';
     error.textContent = message;
-    Object.assign(error.style, {
-      textAlign: 'center',
-      padding: spacing.XXL,
-      fontSize: typo.SIZES.BASE,
-      fontWeight: typo.WEIGHTS.MEDIUM,
-      letterSpacing: typo.LETTER_SPACING.WIDE,
-      color: 'rgba(255, 100, 100, 0.9)',
-      opacity: '1'
-    });
     state.ui.lyricsContainer.appendChild(error);
   }
 
   function displayPlainLyrics(lyrics) {
     if (!state.ui.lyricsContainer) return;
     
-    const typo = CONSTANTS.UI.TYPOGRAPHY;
-    const spacing = CONSTANTS.UI.SPACING;
-    const styles = CONSTANTS.UI.APPLE_MUSIC;
-    
     stopSync();
     state.ui.lyricsContainer.innerHTML = '';
     
     const text = document.createElement('div');
-    Object.assign(text.style, {
-      whiteSpace: 'pre-wrap',
-      lineHeight: typo.LINE_HEIGHTS.LOOSE,
-      fontSize: typo.SIZES.BASE,
-      fontWeight: typo.WEIGHTS.REGULAR,
-      letterSpacing: typo.LETTER_SPACING.WIDE,
-      color: 'rgba(255, 255, 255, 0.9)',
-      padding: spacing.LG,
-      maxWidth: styles.MAX_WIDTH,
-      margin: '0 auto',
-      opacity: '1'
-    });
+    text.className = 'lyrics-plain';
     text.textContent = lyrics;
     state.ui.lyricsContainer.appendChild(text);
   }
@@ -631,48 +471,15 @@
     if (!state.ui.lyricsContainer) return;
     
     state.ui.lyricsContainer.innerHTML = '';
-    const styles = CONSTANTS.UI.APPLE_MUSIC;
-    const typo = CONSTANTS.UI.TYPOGRAPHY;
-    const spacing = CONSTANTS.UI.SPACING;
     
     syncedLyrics.forEach((lyric, index) => {
       const line = document.createElement('div');
       line.className = 'lyric-line';
       line.dataset.index = index;
       line.textContent = lyric.text;
-      
-      // Staggered entrance animation
-      const delay = index * styles.STAGGER_DELAY;
-      
-      Object.assign(line.style, {
-        padding: `${spacing.SM} ${spacing.LG}`,
-        fontSize: typo.SIZES.BASE,
-        fontWeight: typo.WEIGHTS.REGULAR,
-        lineHeight: typo.LINE_HEIGHTS.RELAXED,
-        letterSpacing: typo.LETTER_SPACING.WIDE,
-        color: 'rgba(255, 255, 255, 0.4)',
-        cursor: 'pointer',
-        transition: `all ${styles.TRANSITIONS.NORMAL}`,
-        transform: 'scale(1)',
-        maxWidth: styles.MAX_WIDTH,
-        margin: '0 auto',
-        opacity: '1',
-        willChange: 'transform, opacity, color, font-size'
-      });
+      line.style.display = 'none'; // Initially hide all lines
       
       line.addEventListener('click', () => seekToLyric(index));
-      line.addEventListener('mouseenter', () => {
-        if (!line.classList.contains('current')) {
-          line.style.color = 'rgba(255, 255, 255, 0.75)';
-          line.style.transform = 'scale(1.02)';
-        }
-      });
-      line.addEventListener('mouseleave', () => {
-        if (!line.classList.contains('current')) {
-          line.style.color = 'rgba(255, 255, 255, 0.4)';
-          line.style.transform = 'scale(1)';
-        }
-      });
       
       state.ui.lyricsContainer.appendChild(line);
     });
@@ -681,157 +488,52 @@
   function updateCurrentLyric(currentIndex) {
     if (!state.ui.lyricsContainer) return;
     
-    const styles = CONSTANTS.UI.APPLE_MUSIC;
-    const typo = CONSTANTS.UI.TYPOGRAPHY;
     const lines = state.ui.lyricsContainer.querySelectorAll('.lyric-line');
     
     lines.forEach((line, index) => {
       const isCurrent = index === currentIndex;
-      const isPast = index < currentIndex;
+      const isPrevious = index === currentIndex - 1;
+      const isNext = index === currentIndex + 1;
       
-      if (isCurrent) {
-        line.classList.add('current');
-        Object.assign(line.style, {
-          color: '#ffffff',
-          fontSize: typo.SIZES.CURRENT,
-          fontWeight: typo.WEIGHTS.SEMIBOLD,
-          letterSpacing: typo.LETTER_SPACING.TIGHT,
-          transform: `scale(${styles.CURRENT_SCALE})`,
-          textShadow: '0 2px 20px rgba(255, 255, 255, 0.4)',
-          transition: `all ${styles.TRANSITIONS.SLOW}`
-        });
+      // Remove all state classes first
+      line.classList.remove('current', 'past', 'future');
+      
+      // Show only current, previous, and next lines
+      if (isCurrent || isPrevious || isNext) {
+        line.style.display = 'block';
         
-        // Center the current lyric with accurate calculation
-        setTimeout(() => {
-          const container = state.ui.lyricsContainer;
-          
-          // Force layout recalculation to get accurate dimensions after transform
-          line.getBoundingClientRect();
-          
-          // Get current positions
-          const containerRect = container.getBoundingClientRect();
-          const lineRect = line.getBoundingClientRect();
-          
-          // Calculate how much to scroll to center the line
-          // Container center - line center relative to container top
-          const containerCenter = containerRect.height / 2;
-          const lineCenterRelativeToContainer = lineRect.top - containerRect.top + container.scrollTop;
-          const lineCenter = lineRect.height / 2;
-          
-          // Target scroll position
-          const targetScroll = lineCenterRelativeToContainer - containerCenter + lineCenter;
-          
-          container.scrollTo({ 
-            top: targetScroll,
-            behavior: 'smooth' 
-          });
-        }, 250);
-        
+        if (isCurrent) {
+          line.classList.add('current');
+        } else if (isPrevious) {
+          line.classList.add('past');
+        } else if (isNext) {
+          line.classList.add('future');
+        }
       } else {
-        line.classList.remove('current');
-        Object.assign(line.style, {
-          fontSize: typo.SIZES.BASE,
-          fontWeight: typo.WEIGHTS.REGULAR,
-          letterSpacing: typo.LETTER_SPACING.WIDE,
-          transform: 'scale(1)',
-          textShadow: 'none',
-          transition: `all ${styles.TRANSITIONS.NORMAL}`,
-          color: isPast 
-            ? `rgba(255, 255, 255, ${styles.PAST_OPACITY})` 
-            : `rgba(255, 255, 255, ${styles.FUTURE_OPACITY})`
-        });
+        // Hide all other lines
+        line.style.display = 'none';
       }
     });
   }
 
   function createButton(text, onClick) {
-    const typo = CONSTANTS.UI.TYPOGRAPHY;
-    const spacing = CONSTANTS.UI.SPACING;
-    const styles = CONSTANTS.UI.APPLE_MUSIC;
-    
     const btn = document.createElement('button');
+    btn.className = 'lyrics-button';
     btn.textContent = text;
-    Object.assign(btn.style, {
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: '#ffffff',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
-      borderRadius: styles.RADIUS.SM,
-      padding: `${spacing.XS} ${spacing.MD}`,
-      fontSize: typo.SIZES.SMALL,
-      fontWeight: typo.WEIGHTS.MEDIUM,
-      letterSpacing: typo.LETTER_SPACING.WIDE,
-      cursor: 'pointer',
-      outline: 'none',
-      transition: `all ${styles.TRANSITIONS.FAST}`,
-      WebkitAppearance: 'none',
-      appearance: 'none'
-    });
-    
     btn.addEventListener('click', onClick);
-    btn.addEventListener('mouseenter', () => {
-      btn.style.background = 'rgba(255, 255, 255, 0.2)';
-      btn.style.transform = 'translateY(-1px)';
-      btn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
-    });
-    btn.addEventListener('mouseleave', () => {
-      btn.style.background = 'rgba(255, 255, 255, 0.1)';
-      btn.style.transform = 'translateY(0)';
-      btn.style.boxShadow = 'none';
-    });
-    btn.addEventListener('mousedown', () => {
-      btn.style.transform = 'translateY(0) scale(0.98)';
-    });
-    btn.addEventListener('mouseup', () => {
-      btn.style.transform = 'translateY(-1px) scale(1)';
-    });
-    
     return btn;
   }
 
   function createSelect(id, options, onChange) {
-    const typo = CONSTANTS.UI.TYPOGRAPHY;
-    const spacing = CONSTANTS.UI.SPACING;
-    const styles = CONSTANTS.UI.APPLE_MUSIC;
-    
     const select = document.createElement('select');
+    select.className = 'lyrics-select';
     select.id = id;
-    
-    const dropdownIcon = "data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
-    
-    Object.assign(select.style, {
-      background: 'rgba(255, 255, 255, 0.1)',
-      color: '#ffffff',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
-      borderRadius: styles.RADIUS.SM,
-      padding: `${spacing.XS} ${spacing.SM}`,
-      fontSize: typo.SIZES.SMALL,
-      fontWeight: typo.WEIGHTS.MEDIUM,
-      letterSpacing: typo.LETTER_SPACING.WIDE,
-      cursor: 'pointer',
-      outline: 'none',
-      transition: `all ${styles.TRANSITIONS.FAST}`,
-      WebkitAppearance: 'none',
-      appearance: 'none',
-      backgroundImage: `url("${dropdownIcon}")`,
-      backgroundRepeat: 'no-repeat',
-      backgroundPosition: 'right 0.5rem center',
-      paddingRight: '2rem'
-    });
-    
     select.addEventListener('change', onChange);
-    select.addEventListener('mouseenter', () => {
-      select.style.background = 'rgba(255, 255, 255, 0.15)';
-    });
-    select.addEventListener('mouseleave', () => {
-      select.style.background = 'rgba(255, 255, 255, 0.1)';
-    });
     
     options.forEach(opt => {
       const option = document.createElement('option');
       option.value = opt.value;
       option.textContent = opt.label;
-      option.style.background = '#1a1a1a';
-      option.style.color = '#ffffff';
       select.appendChild(option);
     });
     
@@ -914,36 +616,14 @@
     const existing = document.getElementById('delay-control');
     if (existing) existing.remove();
     
-    const typo = CONSTANTS.UI.TYPOGRAPHY;
-    const spacing = CONSTANTS.UI.SPACING;
-    
     const container = document.createElement('div');
     container.id = 'delay-control';
-    Object.assign(container.style, {
-      display: 'flex',
-      alignItems: 'center',
-      gap: spacing.XS
-    });
     
     const label = document.createElement('span');
     label.textContent = 'Delay: ';
-    Object.assign(label.style, {
-      color: 'rgba(255, 255, 255, 0.8)',
-      fontSize: typo.SIZES.SMALL,
-      fontWeight: typo.WEIGHTS.MEDIUM,
-      letterSpacing: typo.LETTER_SPACING.WIDE
-    });
     
     const display = document.createElement('span');
     display.id = 'delay-display';
-    Object.assign(display.style, {
-      color: '#ffffff',
-      minWidth: 'clamp(3.5rem, 10vw, 4.5rem)',
-      textAlign: 'center',
-      fontSize: typo.SIZES.SMALL,
-      fontWeight: typo.WEIGHTS.SEMIBOLD,
-      letterSpacing: typo.LETTER_SPACING.WIDE
-    });
     display.textContent = '0ms';
     
     function updateDisplay() {
@@ -1054,14 +734,18 @@
     state.sync.currentIndex = -1;
     state.sync.lastKnownIndex = 0;
     
-    startSync();
-    createDelayControl();
-    
-    video.addEventListener('play', () => {
+    // Store handlers for cleanup
+    state.sync.handlePlay = () => {
       state.sync.isPlaying = true;
       syncLoop();
-    });
-    video.addEventListener('pause', stopSync);
+    };
+    state.sync.handlePause = () => stopSync();
+    
+    video.addEventListener('play', state.sync.handlePlay);
+    video.addEventListener('pause', state.sync.handlePause);
+    
+    startSync();
+    createDelayControl();
   }
 
   function initializeLyricsPanel() {
@@ -1086,27 +770,47 @@
   function watchForVideoChanges() {
     let lastTitle = '';
     
-    const observer = new MutationObserver(() => {
+    const handleTitleChange = debounce(() => {
       const titleEl = document.querySelector(CONSTANTS.SELECTORS.VIDEO_TITLE);
       if (titleEl && titleEl.textContent !== lastTitle) {
         lastTitle = titleEl.textContent;
         resetState();
         setTimeout(() => initializeLyricsPanel(), 500);
       }
-    });
+    }, 250);
+    
+    state.titleObserver = new MutationObserver(handleTitleChange);
     
     const titleContainer = document.querySelector('#title');
     if (titleContainer) {
-      observer.observe(titleContainer, { childList: true, subtree: true });
+      state.titleObserver.observe(titleContainer, { childList: true, subtree: true });
     }
   }
 
   function resetState() {
+    // Clean up video event listeners
+    if (state.sync.videoElement) {
+      if (state.sync.handlePlay) {
+        state.sync.videoElement.removeEventListener('play', state.sync.handlePlay);
+      }
+      if (state.sync.handlePause) {
+        state.sync.videoElement.removeEventListener('pause', state.sync.handlePause);
+      }
+      state.sync.videoElement = null;
+    }
+    
+    // Stop sync and cancel animation frame
+    stopSync();
+    
+    // Clear state
     state.hasRun = false;
     state.currentTitle = '';
     state.currentData = null;
     state.syncedLyrics = [];
-    stopSync();
+    state.sync.handlePlay = null;
+    state.sync.handlePause = null;
+    
+    // Remove UI
     removePanel();
   }
 
