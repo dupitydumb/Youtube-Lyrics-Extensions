@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Load saved settings
   chrome.storage.sync.get(["isEnabled"], (data) => {
-    const isEnabled = data.isEnabled !== false; // Default to true
+    const isEnabled = data.isEnabled === true; // Default to false
     toggleSwitch.checked = isEnabled;
     updateStatus(isEnabled);
   });

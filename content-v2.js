@@ -158,7 +158,7 @@
     syncedLyrics: [],
     titleObserver: null,
     background: {
-      mode: 'gradient', // 'none', 'gradient', 'album', 'video'
+      mode: 'album', // 'none', 'gradient', 'album', 'video'
       imageUrl: null,
       dominantColor: null,
       element: null,
@@ -296,12 +296,12 @@
   async function loadBackgroundSettings() {
     try {
       const data = await chrome.storage.sync.get(['backgroundMode', 'gradientTheme', 'customColors']);
-      state.background.mode = data.backgroundMode || 'gradient';
+      state.background.mode = data.backgroundMode || 'album';
       state.background.gradientTheme = data.gradientTheme || 'random';
       state.background.customColors = data.customColors || ['#667eea', '#764ba2', '#f093fb', '#4facfe'];
     } catch (error) {
       console.warn('Failed to load background settings:', error);
-      state.background.mode = 'gradient';
+      state.background.mode = 'album';
       state.background.gradientTheme = 'random';
     }
   }
@@ -546,67 +546,21 @@
     container.appendChild(vinylContainer);
   }
 
-  function createAnimatedGradientBlobs(container, colors) {
+  function createStaticGradient(container, colors) {
     if (!container) return;
     
-    // Clear existing blobs
+    // Clear existing content
     container.innerHTML = '';
     
-    // Create multiple blob elements
-    const blobCount = 4;
+    // Create simple static gradient using CSS
+    const gradient = `
+      radial-gradient(ellipse at 20% 30%, ${colors[0]} 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, ${colors[1]} 0%, transparent 50%),
+      radial-gradient(ellipse at 40% 80%, ${colors[2]} 0%, transparent 50%),
+      radial-gradient(ellipse at 70% 20%, ${colors[3]} 0%, transparent 50%)
+    `;
     
-    for (let i = 0; i < blobCount; i++) {
-      const blob = document.createElement('div');
-      blob.className = 'gradient-blob';
-      
-      const size = 300 + Math.random() * 200;
-      const color = colors[i % colors.length];
-      
-      blob.style.cssText = `
-        position: absolute;
-        width: ${size}px;
-        height: ${size}px;
-        background: ${color};
-        border-radius: 50%;
-        filter: blur(60px);
-        opacity: 0.6;
-        animation: blob-float-${i} ${15 + i * 3}s ease-in-out infinite;
-        animation-delay: ${i * -2}s;
-      `;
-      
-      container.appendChild(blob);
-    }
-    
-    // Inject keyframes for each blob
-    if (!document.getElementById('blob-animations')) {
-      const style = document.createElement('style');
-      style.id = 'blob-animations';
-      
-      let keyframes = '';
-      for (let i = 0; i < blobCount; i++) {
-        const startX = Math.random() * 100;
-        const startY = Math.random() * 100;
-        keyframes += `
-          @keyframes blob-float-${i} {
-            0%, 100% {
-              transform: translate(${startX}%, ${startY}%) scale(1);
-            }
-            25% {
-              transform: translate(${(startX + 30) % 100}%, ${(startY - 20) % 100}%) scale(1.1);
-            }
-            50% {
-              transform: translate(${(startX - 20) % 100}%, ${(startY + 30) % 100}%) scale(0.9);
-            }
-            75% {
-              transform: translate(${(startX + 10) % 100}%, ${(startY - 10) % 100}%) scale(1.05);
-            }
-          }
-        `;
-      }
-      
-      style.textContent = keyframes;
-      document.head.appendChild(style);
-    }
+    container.style.background = gradient;
   }
 
   function createVinylDiscBackground(container, imageUrl) {
@@ -782,11 +736,9 @@
       const colors = getGradientColors();
       console.log('Using gradient colors:', colors);
       
-      // Create animated gradient blobs
-      createAnimatedGradientBlobs(bgLayer, colors);
+      // Create static gradient (no animation for better performance)
+      createStaticGradient(bgLayer, colors);
       
-      // Add base gradient background
-      bgLayer.style.background = `linear-gradient(135deg, rgba(20, 20, 25, 0.6) 0%, rgba(10, 10, 15, 0.8) 100%)`;
       bgLayer.style.opacity = '1';
       console.log('Background updated successfully');
     } else if (mode === 'album' || mode === 'video') {
@@ -839,8 +791,7 @@
     const mode = state.background.mode;
     if (mode === 'gradient') {
       const colors = getGradientColors();
-      createAnimatedGradientBlobs(bgLayer, colors);
-      bgLayer.style.background = `linear-gradient(135deg, rgba(10, 10, 15, 0.85) 0%, rgba(5, 5, 10, 0.95) 100%)`;
+      createStaticGradientFullscreen(bgLayer, colors);
     } else if (mode === 'album') {
       // Create vinyl disc effect for fullscreen
       if (thumbnailUrl) {
@@ -876,34 +827,19 @@
     return { overlay, lyricsContainer };
   }
 
-  function createAnimatedGradientBlobs(container, colors) {
-    // Clear existing blobs
+  function createStaticGradientFullscreen(container, colors) {
+    // Clear existing content
     container.innerHTML = '';
     
-    // Create multiple blob elements
-    const blobCount = 4;
+    // Create simple static gradient for fullscreen
+    const gradient = `
+      radial-gradient(ellipse at 20% 30%, ${colors[0]} 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, ${colors[1]} 0%, transparent 50%),
+      radial-gradient(ellipse at 40% 80%, ${colors[2]} 0%, transparent 50%),
+      radial-gradient(ellipse at 70% 20%, ${colors[3]} 0%, transparent 50%)
+    `;
     
-    for (let i = 0; i < blobCount; i++) {
-      const blob = document.createElement('div');
-      blob.className = 'gradient-blob';
-      
-      const size = 400 + Math.random() * 300;
-      const color = colors[i % colors.length];
-      
-      blob.style.cssText = `
-        position: absolute;
-        width: ${size}px;
-        height: ${size}px;
-        background: ${color};
-        border-radius: 50%;
-        filter: blur(80px);
-        opacity: 0.7;
-        animation: blob-float-${i} ${15 + i * 3}s ease-in-out infinite;
-        animation-delay: ${i * -2}s;
-      `;
-      
-      container.appendChild(blob);
-    }
+    container.style.background = gradient;
   }
 
   function toggleFullscreenMode() {
@@ -1040,11 +976,11 @@
     const btn = document.getElementById('lyrics-fullscreen-btn');
     if (btn) {
       if (state.ui.fullscreenMode) {
-        btn.textContent = '🚪';
+        btn.innerHTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 20px; height: 20px;"><path d="M14 4h6v6h-2V6h-4V4zM4 14H2V8h2v6zm16-4h2v6h-2v-6zM8 20v-2H4v-2H2v6h6v-2h2z" fill="#667eea"></path></svg>';
         btn.setAttribute('title', 'Exit Fullscreen (ESC)');
         btn.style.color = '#667eea';
       } else {
-        btn.textContent = '🎤';
+        btn.innerHTML = '<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="width: 20px; height: 20px;"><polygon fill="#ffffff" points="0.001,437.167 74.823,512 354.337,254.387 257.614,157.664"></polygon><path fill="#ffffff" d="M269.9,143.663l98.428,98.417c34.239,6.143,70.52-2.472,98.869-25.709L295.63,44.804 C272.393,73.153,263.757,109.412,269.9,143.663z"></path><path fill="#ffffff" d="M476.317,35.674c-45.989-45.98-119.466-47.463-167.392-4.734l172.135,172.135 C523.789,155.15,522.306,81.663,476.317,35.674z"></path></svg>';
         btn.setAttribute('title', 'Fullscreen Karaoke (F)');
         btn.style.color = 'white';
       }
@@ -1369,20 +1305,20 @@
     container.id = 'lyrics-video-settings-container';
     container.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-right: 8px;';
 
-    // Create label
+    // Create label with SVG icon
     const label = document.createElement('span');
-    label.textContent = '🎵';
-    label.style.cssText = 'font-size: 18px; opacity: 0.9; user-select: none; pointer-events: none;';
+    label.innerHTML = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 18px; height: 18px;"><path d="M9.772 4.28c.56-.144 1.097.246 1.206.814.1.517-.263 1.004-.771 1.14A7 7 0 1 0 19 12.9c.009-.5.4-.945.895-1 .603-.067 1.112.371 1.106.977L21 13c0 .107-.002.213-.006.32a.898.898 0 0 1 0 .164l-.008.122a9 9 0 0 1-9.172 8.392A9 9 0 0 1 9.772 4.28z" fill="#ffffff"></path><path d="M15.93 13.753a4.001 4.001 0 1 1-6.758-3.581A4 4 0 0 1 12 9c.75 0 1.3.16 2 .53 0 0 .15.09.25.17-.1-.35-.228-1.296-.25-1.7a58.75 58.75 0 0 1-.025-2.035V2.96c0-.52.432-.94.965-.94.103 0 .206.016.305.048l4.572 1.689c.446.145.597.23.745.353.148.122.258.27.33.446.073.176.108.342.108.801v1.16c0 .518-.443.94-.975.94a.987.987 0 0 1-.305-.049l-1.379-.447-.151-.05c-.437-.14-.618-.2-.788-.26a5.697 5.697 0 0 1-.514-.207 3.53 3.53 0 0 1-.213-.107c-.098-.05-.237-.124-.521-.263L16 6l.011 7c0 .255-.028.507-.082.753h.001z" fill="#ffffff"></path></svg>';
+    label.style.cssText = 'display: flex; align-items: center; opacity: 0.9; user-select: none; pointer-events: none;';
     
-    // Create fullscreen karaoke button
+    // Create fullscreen karaoke button with SVG icon
     const fullscreenBtn = document.createElement('button');
     fullscreenBtn.id = 'lyrics-fullscreen-btn';
     fullscreenBtn.className = 'ytp-button';
     fullscreenBtn.setAttribute('aria-label', 'Fullscreen Karaoke');
     fullscreenBtn.setAttribute('title', 'Fullscreen Karaoke (F)');
     fullscreenBtn.setAttribute('data-control-id', 'fullscreen-btn');
-    fullscreenBtn.style.cssText = 'width: 32px; height: 32px; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none; color: white; opacity: 0.9;';
-    fullscreenBtn.textContent = '🎤';
+    fullscreenBtn.style.cssText = 'width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none; color: white; opacity: 0.9;';
+    fullscreenBtn.innerHTML = '<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="width: 20px; height: 20px;"><polygon fill="#ffffff" points="0.001,437.167 74.823,512 354.337,254.387 257.614,157.664"></polygon><path fill="#ffffff" d="M269.9,143.663l98.428,98.417c34.239,6.143,70.52-2.472,98.869-25.709L295.63,44.804 C272.393,73.153,263.757,109.412,269.9,143.663z"></path><path fill="#ffffff" d="M476.317,35.674c-45.989-45.98-119.466-47.463-167.392-4.734l172.135,172.135 C523.789,155.15,522.306,81.663,476.317,35.674z"></path></svg>';
     
     fullscreenBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2070,7 +2006,7 @@
     
     // Load settings
     chrome.storage.sync.get(['isEnabled'], (data) => {
-      state.isEnabled = data.isEnabled || false;
+      state.isEnabled = data.isEnabled === true;
       
       if (!state.isEnabled) {
         console.log('Extension is disabled');
@@ -2092,7 +2028,7 @@
   // Listen for settings changes
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.isEnabled) {
-      state.isEnabled = changes.isEnabled.newValue;
+      // Reload the page when extension is toggled
       location.reload();
     }
   });
