@@ -38,6 +38,19 @@
       VIDEO_PLAYER: 'video'
     },
     
+    PRESET_GRADIENTS: [
+      { name: 'Sunset', colors: ['#FF6B6B', '#FFE66D', '#4ECDC4', '#FF6B9D'] },
+      { name: 'Ocean', colors: ['#667eea', '#764ba2', '#f093fb', '#4facfe'] },
+      { name: 'Forest', colors: ['#56ab2f', '#a8e063', '#38ef7d', '#11998e'] },
+      { name: 'Fire', colors: ['#f83600', '#f9d423', '#ff0844', '#ffb199'] },
+      { name: 'Purple Dream', colors: ['#c471f5', '#fa71cd', '#a770ef', '#fdb99b'] },
+      { name: 'Cool Blues', colors: ['#2193b0', '#6dd5ed', '#00d2ff', '#3a7bd5'] },
+      { name: 'Warm Sunset', colors: ['#ff9a56', '#ff6a00', '#ee0979', '#ff6a00'] },
+      { name: 'Northern Lights', colors: ['#00c6ff', '#0072ff', '#00f260', '#0575e6'] },
+      { name: 'Peach', colors: ['#ffecd2', '#fcb69f', '#ff9a9e', '#fecfef'] },
+      { name: 'Neon', colors: ['#f953c6', '#b91d73', '#12c2e9', '#c471ed'] }
+    ],
+    
     UI: {
       PANEL_ID: 'Lyric-Panel',
       PANEL_CONTAINER_ID: 'Lyric-Panel-Container',
@@ -136,6 +149,14 @@
     currentData: null,
     syncedLyrics: [],
     titleObserver: null,
+    background: {
+      mode: 'gradient', // 'none', 'gradient', 'album', 'video'
+      imageUrl: null,
+      dominantColor: null,
+      element: null,
+      gradientTheme: 'random', // 'random', 'Sunset', 'Ocean', etc., or 'custom'
+      customColors: ['#667eea', '#764ba2', '#f093fb', '#4facfe']
+    },
     sync: {
       currentIndex: -1,
       lastKnownIndex: 0,
@@ -173,6 +194,494 @@
       clearTimeout(timeout);
       timeout = setTimeout(later, wait);
     };
+  }
+
+  // ==================== BACKGROUND UTILITIES ====================
+
+  function extractVideoThumbnail() {
+    // Try to get high-quality thumbnail from YouTube metadata
+    const metaOgImage = document.querySelector('meta[property="og:image"]');
+    if (metaOgImage) {
+      let thumbnailUrl = metaOgImage.content;
+      // Convert to maxresdefault for highest quality
+      thumbnailUrl = thumbnailUrl.replace(/\/vi\/([^\/]+)\/.*/, '/vi/$1/maxresdefault.jpg');
+      return thumbnailUrl;
+    }
+    
+    // Fallback: extract from video element
+    const video = document.querySelector('video');
+    if (video) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1280;
+        canvas.height = 720;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL('image/jpeg', 0.8);
+      } catch (e) {
+        console.error('Failed to capture video frame:', e);
+      }
+    }
+    
+    return null;
+  }
+
+  function extractDominantColor(imageUrl) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = 100;
+          canvas.height = 100;
+          
+          ctx.drawImage(img, 0, 0, 100, 100);
+          const imageData = ctx.getImageData(0, 0, 100, 100).data;
+          
+          let r = 0, g = 0, b = 0, count = 0;
+          
+          // Sample every 4th pixel for performance
+          for (let i = 0; i < imageData.length; i += 16) {
+            r += imageData[i];
+            g += imageData[i + 1];
+            b += imageData[i + 2];
+            count++;
+          }
+          
+          r = Math.floor(r / count);
+          g = Math.floor(g / count);
+          b = Math.floor(b / count);
+          
+          resolve(`rgb(${r}, ${g}, ${b})`);
+        } catch (e) {
+          console.error('Failed to extract color:', e);
+          resolve('rgb(30, 30, 35)');
+        }
+      };
+      
+      img.onerror = () => {
+        resolve('rgb(30, 30, 35)');
+      };
+      
+      img.src = imageUrl;
+    });
+  }
+
+  async function loadBackgroundSettings() {
+    try {
+      const data = await chrome.storage.sync.get(['backgroundMode', 'gradientTheme', 'customColors']);
+      state.background.mode = data.backgroundMode || 'gradient';
+      state.background.gradientTheme = data.gradientTheme || 'random';
+      state.background.customColors = data.customColors || ['#667eea', '#764ba2', '#f093fb', '#4facfe'];
+    } catch (error) {
+      console.warn('Failed to load background settings:', error);
+      state.background.mode = 'gradient';
+      state.background.gradientTheme = 'random';
+    }
+  }
+
+  function saveBackgroundSettings() {
+    try {
+      chrome.storage.sync.set({ 
+        backgroundMode: state.background.mode,
+        gradientTheme: state.background.gradientTheme,
+        customColors: state.background.customColors
+      });
+    } catch (error) {
+      console.warn('Failed to save background settings:', error);
+    }
+  }
+
+  function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? `rgb(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)})` : 'rgb(102, 126, 234)';
+  }
+
+  function generateRandomGradientColors() {
+    const colors = [];
+    for (let i = 0; i < 4; i++) {
+      const hue = Math.floor(Math.random() * 360);
+      const saturation = 60 + Math.floor(Math.random() * 30);
+      const lightness = 50 + Math.floor(Math.random() * 20);
+      
+      // Convert HSL to RGB
+      const h = hue / 360;
+      const s = saturation / 100;
+      const l = lightness / 100;
+      
+      let r, g, b;
+      if (s === 0) {
+        r = g = b = l;
+      } else {
+        const hue2rgb = (p, q, t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+      }
+      
+      colors.push(`rgb(${Math.round(r*255)}, ${Math.round(g*255)}, ${Math.round(b*255)})`);
+    }
+    return colors;
+  }
+
+  function getGradientColors() {
+    const theme = state.background.gradientTheme;
+    
+    if (theme === 'random') {
+      return generateRandomGradientColors();
+    } else if (theme === 'custom') {
+      return state.background.customColors.map(hexToRgb);
+    } else {
+      // Find preset
+      const preset = CONSTANTS.PRESET_GRADIENTS.find(p => p.name === theme);
+      if (preset) {
+        return preset.colors.map(hexToRgb);
+      }
+      return generateRandomGradientColors();
+    }
+  }
+
+  function generateComplementaryColors(baseColor) {
+    // Parse RGB values from baseColor string
+    const match = baseColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (!match) return [baseColor, baseColor, baseColor];
+    
+    let [_, r, g, b] = match.map(Number);
+    
+    // Convert to HSL for easier manipulation
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+    
+    if (max === min) {
+      h = s = 0;
+    } else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+        case g: h = ((b - r) / d + 2) / 6; break;
+        case b: h = ((r - g) / d + 4) / 6; break;
+      }
+    }
+    
+    // Generate colors with different hue shifts
+    const colors = [];
+    const shifts = [0, 0.15, 0.3, -0.15]; // Different hue rotations
+    
+    shifts.forEach(shift => {
+      let newH = (h + shift) % 1;
+      if (newH < 0) newH += 1;
+      
+      // Slightly vary saturation and lightness
+      const newS = Math.min(1, s * (0.8 + Math.random() * 0.4));
+      const newL = Math.max(0.2, Math.min(0.8, l * (0.7 + Math.random() * 0.6)));
+      
+      // Convert back to RGB
+      let r2, g2, b2;
+      if (newS === 0) {
+        r2 = g2 = b2 = newL;
+      } else {
+        const hue2rgb = (p, q, t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        const q = newL < 0.5 ? newL * (1 + newS) : newL + newS - newL * newS;
+        const p = 2 * newL - q;
+        r2 = hue2rgb(p, q, newH + 1/3);
+        g2 = hue2rgb(p, q, newH);
+        b2 = hue2rgb(p, q, newH - 1/3);
+      }
+      
+      const rgb = `rgb(${Math.round(r2*255)}, ${Math.round(g2*255)}, ${Math.round(b2*255)})`;
+      colors.push(rgb);
+    });
+    
+    return colors;
+  }
+
+  function createAnimatedGradientBlobs(colors) {
+    const container = state.background.element;
+    if (!container) return;
+    
+    // Clear existing blobs
+    container.innerHTML = '';
+    
+    // Create multiple blob elements
+    const blobs = [];
+    const blobCount = 4;
+    
+    for (let i = 0; i < blobCount; i++) {
+      const blob = document.createElement('div');
+      blob.className = 'gradient-blob';
+      
+      const size = 300 + Math.random() * 200;
+      const color = colors[i % colors.length];
+      
+      blob.style.cssText = `
+        position: absolute;
+        width: ${size}px;
+        height: ${size}px;
+        background: ${color};
+        border-radius: 50%;
+        filter: blur(60px);
+        opacity: 0.6;
+        animation: blob-float-${i} ${15 + i * 3}s ease-in-out infinite;
+        animation-delay: ${i * -2}s;
+      `;
+      
+      container.appendChild(blob);
+      blobs.push(blob);
+    }
+    
+    // Inject keyframes for each blob
+    if (!document.getElementById('blob-animations')) {
+      const style = document.createElement('style');
+      style.id = 'blob-animations';
+      
+      let keyframes = '';
+      for (let i = 0; i < blobCount; i++) {
+        const startX = Math.random() * 100;
+        const startY = Math.random() * 100;
+        keyframes += `
+          @keyframes blob-float-${i} {
+            0%, 100% {
+              transform: translate(${startX}%, ${startY}%) scale(1);
+            }
+            25% {
+              transform: translate(${(startX + 30) % 100}%, ${(startY - 20) % 100}%) scale(1.1);
+            }
+            50% {
+              transform: translate(${(startX - 20) % 100}%, ${(startY + 30) % 100}%) scale(0.9);
+            }
+            75% {
+              transform: translate(${(startX + 10) % 100}%, ${(startY - 10) % 100}%) scale(1.05);
+            }
+          }
+        `;
+      }
+      
+      style.textContent = keyframes;
+      document.head.appendChild(style);
+    }
+  }
+
+  function createVinylDiscBackground(container, imageUrl) {
+    // Create blurred background
+    const bgBlur = document.createElement('div');
+    bgBlur.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: url('${imageUrl}');
+      background-size: cover;
+      background-position: center;
+      filter: blur(40px) brightness(0.4);
+      z-index: 0;
+    `;
+    
+    // Create vinyl disc container - positioned to the left with only half visible
+    const vinylContainer = document.createElement('div');
+    vinylContainer.className = 'vinyl-disc-container';
+    vinylContainer.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: -25%;
+      transform: translateY(-50%);
+      width: 600px;
+      height: 600px;
+      z-index: 1;
+    `;
+    
+    // Create vinyl disc
+    const vinyl = document.createElement('div');
+    vinyl.className = 'vinyl-disc';
+    vinyl.style.cssText = `
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, 
+        transparent 0%, 
+        transparent 25%, 
+        rgba(0,0,0,0.3) 25%, 
+        rgba(0,0,0,0.5) 30%,
+        rgba(0,0,0,0.3) 30%,
+        rgba(0,0,0,0.5) 100%);
+      animation: vinyl-spin 8s linear infinite;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    `;
+    
+    // Create album cover in center
+    const albumCover = document.createElement('div');
+    albumCover.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60%;
+      height: 60%;
+      border-radius: 50%;
+      background-image: url('${imageUrl}');
+      background-size: cover;
+      background-position: center;
+      box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.8),
+                  inset 0 4px 12px rgba(0, 0, 0, 0.5);
+    `;
+    
+    // Create center hole
+    const centerHole = document.createElement('div');
+    centerHole.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20%;
+      height: 20%;
+      border-radius: 50%;
+      background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8),
+                  inset 0 1px 4px rgba(255, 255, 255, 0.1);
+    `;
+    
+    // Add shine effect
+    const shine = document.createElement('div');
+    shine.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, 
+        rgba(255,255,255,0.1) 0%, 
+        transparent 50%, 
+        rgba(255,255,255,0.05) 100%);
+      pointer-events: none;
+    `;
+    
+    vinyl.appendChild(albumCover);
+    vinyl.appendChild(centerHole);
+    vinyl.appendChild(shine);
+    vinylContainer.appendChild(vinyl);
+    
+    container.appendChild(bgBlur);
+    container.appendChild(vinylContainer);
+    
+    // Add vinyl spin animation
+    if (!document.getElementById('vinyl-animations')) {
+      const style = document.createElement('style');
+      style.id = 'vinyl-animations';
+      style.textContent = `
+        @keyframes vinyl-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
+        @media (prefers-reduced-motion: reduce) {
+          .vinyl-disc {
+            animation: none !important;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }
+
+  function createBackgroundLayer() {
+    if (state.background.element) {
+      state.background.element.remove();
+    }
+     
+    const bgLayer = document.createElement('div');
+    bgLayer.id = 'lyrics-background';
+    bgLayer.className = 'lyrics-background';
+    
+    // Set inline styles to ensure it works
+    bgLayer.style.position = 'absolute';
+    bgLayer.style.inset = '-150px';
+    bgLayer.style.borderRadius = '16px';
+    bgLayer.style.opacity = '0';
+    bgLayer.style.overflow = 'hidden';
+    bgLayer.style.transition = 'opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
+    bgLayer.style.pointerEvents = 'none';
+    bgLayer.style.filter = 'blur(5px)';
+    
+    state.background.element = bgLayer;
+    console.log('Background layer created:', bgLayer);
+    return bgLayer;
+  }
+
+  async function updateBackground() {
+    if (!state.ui.container || !state.background.element) return;
+    
+    const mode = state.background.mode;
+    const bgLayer = state.background.element;
+    
+    console.log('Updating background, mode:', mode);
+    
+    if (mode === 'none') {
+      bgLayer.style.opacity = '0';
+      bgLayer.innerHTML = '';
+      return;
+    }
+    
+    if (mode === 'gradient') {
+      // Use theme-based gradient colors
+      const colors = getGradientColors();
+      console.log('Using gradient colors:', colors);
+      
+      // Create animated gradient blobs
+      createAnimatedGradientBlobs(colors);
+      
+      // Add base gradient background
+      bgLayer.style.background = `linear-gradient(135deg, rgba(20, 20, 25, 0.6) 0%, rgba(10, 10, 15, 0.8) 100%)`;
+      bgLayer.style.opacity = '1';
+      console.log('Background updated successfully');
+    } else if (mode === 'album' || mode === 'video') {
+      const thumbnailUrl = extractVideoThumbnail();
+      console.log('Thumbnail URL:', thumbnailUrl);
+      
+      if (thumbnailUrl) {
+        state.background.imageUrl = thumbnailUrl;
+        
+        bgLayer.innerHTML = '';
+        bgLayer.style.background = 'none';
+        
+        if (mode === 'album') {
+          // Create vinyl disc effect for album mode
+          createVinylDiscBackground(bgLayer, thumbnailUrl);
+        } else {
+          // Video blur mode
+          bgLayer.style.backgroundImage = `url('${thumbnailUrl}')`;
+          bgLayer.style.backgroundSize = 'cover';
+          bgLayer.style.backgroundPosition = 'center';
+          bgLayer.style.filter = 'blur(20px) brightness(0.5)';
+        }
+        bgLayer.style.opacity = '1';
+        console.log('Background updated successfully');
+      } else {
+        console.warn('No thumbnail URL found');
+      }
+    }
   }
 
   // Pre-compute Korean characters for performance
@@ -379,10 +888,17 @@
     // Container - all styles in external CSS
     state.ui.container = document.createElement('div');
     state.ui.container.id = CONSTANTS.UI.PANEL_CONTAINER_ID;
+    state.ui.container.style.position = 'relative';
+    
+    // Create background layer first
+    const bgLayer = createBackgroundLayer();
+    state.ui.container.appendChild(bgLayer);
     
     // Panel
     state.ui.panel = document.createElement('div');
     state.ui.panel.id = CONSTANTS.UI.PANEL_ID;
+    state.ui.panel.style.position = 'relative';
+    state.ui.panel.style.zIndex = '1';
     
     // Header
     const header = createHeader();
@@ -396,6 +912,8 @@
     // Controls
     state.ui.controlsContainer = document.createElement('div');
     state.ui.controlsContainer.id = 'lyrics-controls';
+    state.ui.controlsContainer.style.position = 'relative';
+    state.ui.controlsContainer.style.zIndex = '2';
     state.ui.panel.appendChild(state.ui.controlsContainer);
     
     state.ui.container.appendChild(state.ui.panel);
@@ -411,11 +929,15 @@
     const title = document.createElement('h3');
     title.id = 'song-title';
     title.textContent = 'Lyrics';
+    title.style.textAlign = 'center';
+    title.style.marginTop = '3vw';
+
     
     const artist = document.createElement('p');
     artist.id = 'song-artist';
     artist.textContent = '';
     artist.style.display = 'none';
+    artist.style.textAlign = 'center';
     
     titleContainer.appendChild(title);
     titleContainer.appendChild(artist);
@@ -654,6 +1176,101 @@
     addControl(container);
   }
 
+  function createBackgroundControl() {
+    const existing = document.getElementById('background-control');
+    if (existing) existing.remove();
+    
+    const container = document.createElement('div');
+    container.id = 'background-control';
+    container.style.display = 'flex';
+    container.style.gap = '0.5rem';
+    container.style.flexWrap = 'wrap';
+    container.style.alignItems = 'center';
+    
+    const label = document.createElement('span');
+    label.textContent = 'Background: ';
+    
+    const options = [
+      { value: 'none', label: '⬛ None' },
+      { value: 'gradient', label: '🎨 Gradient' },
+      { value: 'album', label: '🖼️ Album Art' },
+      { value: 'video', label: '🎬 Video Blur' }
+    ];
+    
+    const select = createSelect('background-mode-select', options, async (e) => {
+      state.background.mode = e.target.value;
+      saveBackgroundSettings();
+      
+      // Show/hide gradient theme selector
+      const themeControl = document.getElementById('gradient-theme-control');
+      if (e.target.value === 'gradient' && themeControl) {
+        themeControl.style.display = 'flex';
+      } else if (themeControl) {
+        themeControl.style.display = 'none';
+      }
+      
+      await updateBackground();
+    });
+    
+    select.value = state.background.mode;
+    
+    container.appendChild(label);
+    container.appendChild(select);
+    
+    addControl(container);
+    
+    // Add gradient theme selector
+    createGradientThemeControl();
+  }
+
+  function createGradientThemeControl() {
+    const existing = document.getElementById('gradient-theme-control');
+    if (existing) existing.remove();
+    
+    const container = document.createElement('div');
+    container.id = 'gradient-theme-control';
+    container.style.display = state.background.mode === 'gradient' ? 'flex' : 'none';
+    container.style.gap = '0.5rem';
+    container.style.alignItems = 'center';
+    
+    const label = document.createElement('span');
+    label.textContent = 'Theme: ';
+    
+    // Build options from presets
+    const options = [
+      { value: 'random', label: '🎲 Random' },
+      ...CONSTANTS.PRESET_GRADIENTS.map(preset => ({ 
+        value: preset.name, 
+        label: preset.name 
+      }))
+    ];
+    
+    const select = createSelect('gradient-theme-select', options, async (e) => {
+      state.background.gradientTheme = e.target.value;
+      saveBackgroundSettings();
+      await updateBackground();
+    });
+    
+    select.value = state.background.gradientTheme;
+    select.style.minWidth = '120px';
+    
+    // Add refresh button for random
+    const refreshBtn = createButton('🔄', async () => {
+      if (state.background.gradientTheme === 'random') {
+        await updateBackground();
+      }
+    });
+    refreshBtn.title = 'Generate new random gradient';
+    refreshBtn.style.minWidth = '2.5rem';
+    refreshBtn.style.padding = '0.5rem';
+    
+    container.appendChild(label);
+    container.appendChild(select);
+    container.appendChild(refreshBtn);
+    
+    addControl(container);
+  }
+
   // ==================== MAIN LOGIC ====================
   
   function extractVideoInfo() {
@@ -677,6 +1294,12 @@
     
     try {
       showLoading();
+      
+      // Load background settings
+      await loadBackgroundSettings();
+      
+      // Update background with video thumbnail
+      await updateBackground();
       
       let results = await searchLyrics(videoInfo.formattedTitle);
       
@@ -712,6 +1335,7 @@
     const plain = data.plainLyrics || CONSTANTS.MESSAGES.NO_LYRICS;
     
     createModeToggle(synced.length > 0);
+    createBackgroundControl();
     
     if (synced.length > 0) {
       initSyncedLyrics(synced);
