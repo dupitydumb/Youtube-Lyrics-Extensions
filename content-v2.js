@@ -56,6 +56,14 @@
       PANEL_CONTAINER_ID: 'Lyric-Panel-Container',
       SYNC_DELAY_DEFAULT: 0,
       
+      // Control Sections
+      SECTIONS: {
+        SONG: { id: 'song-section', title: '🎵 Song Selection', icon: '🎵', defaultOpen: false },
+        PLAYBACK: { id: 'playback-section', title: '▶️ Playback Mode', icon: '▶️', defaultOpen: true },
+        SYNC: { id: 'sync-section', title: '⏱️ Sync Timing', icon: '⏱️', defaultOpen: false },
+        VISUAL: { id: 'visual-section', title: '🎨 Visual Settings', icon: '🎨', defaultOpen: false }
+      },
+      
       // Responsive Typography Scale (rem-based)
       TYPOGRAPHY: {
         // Fluid font sizes using clamp()
@@ -171,7 +179,9 @@
       panel: null,
       container: null,
       lyricsContainer: null,
-      controlsContainer: null
+      controlsContainer: null,
+      collapsedSections: {},
+      controlsVisible: false
     },
     cache: new Map()
   };
@@ -638,9 +648,14 @@
     
     console.log('Updating background, mode:', mode);
     
+    // Clear all previous background styles and content first
+    bgLayer.innerHTML = '';
+    bgLayer.style.background = 'none';
+    bgLayer.style.backgroundImage = 'none';
+    bgLayer.style.filter = 'none';
+    bgLayer.style.opacity = '0';
+    
     if (mode === 'none') {
-      bgLayer.style.opacity = '0';
-      bgLayer.innerHTML = '';
       return;
     }
     
@@ -657,14 +672,13 @@
       bgLayer.style.opacity = '1';
       console.log('Background updated successfully');
     } else if (mode === 'album' || mode === 'video') {
+      // Always fetch fresh thumbnail for current video
       const thumbnailUrl = extractVideoThumbnail();
       console.log('Thumbnail URL:', thumbnailUrl);
       
       if (thumbnailUrl) {
+        // Update cache with new thumbnail
         state.background.imageUrl = thumbnailUrl;
-        
-        bgLayer.innerHTML = '';
-        bgLayer.style.background = 'none';
         
         if (mode === 'album') {
           // Create vinyl disc effect for album mode
@@ -676,8 +690,13 @@
           bgLayer.style.backgroundPosition = 'center';
           bgLayer.style.filter = 'blur(20px) brightness(0.5)';
         }
-        bgLayer.style.opacity = '1';
-        console.log('Background updated successfully');
+        
+        // Small delay to ensure smooth transition
+        setTimeout(() => {
+          bgLayer.style.opacity = '1';
+        }, 50);
+        
+        console.log('Background updated successfully with new thumbnail');
       } else {
         console.warn('No thumbnail URL found');
       }
@@ -879,6 +898,107 @@
 
   // ==================== UI FUNCTIONS ====================
   
+  function createCollapsibleSection(sectionConfig) {
+    const section = document.createElement('div');
+    section.className = 'control-section';
+    section.dataset.sectionId = sectionConfig.id;
+    
+    const header = document.createElement('div');
+    header.className = 'control-section-header';
+    
+    const title = document.createElement('span');
+    title.className = 'control-section-title';
+    title.textContent = sectionConfig.title;
+    
+    const toggle = document.createElement('span');
+    toggle.className = 'control-section-toggle';
+    toggle.textContent = '▼';
+    
+    header.appendChild(title);
+    header.appendChild(toggle);
+    
+    const content = document.createElement('div');
+    content.className = 'control-section-content';
+    
+    // Check if section should be collapsed
+    const isCollapsed = state.ui.collapsedSections[sectionConfig.id] ?? !sectionConfig.defaultOpen;
+    
+    if (isCollapsed) {
+      section.classList.add('collapsed');
+      content.style.maxHeight = '0';
+      toggle.textContent = '▶';
+    } else {
+      content.style.maxHeight = content.scrollHeight + 'px';
+    }
+    
+    header.addEventListener('click', () => {
+      const wasCollapsed = section.classList.contains('collapsed');
+      
+      if (wasCollapsed) {
+        section.classList.remove('collapsed');
+        toggle.textContent = '▼';
+        content.style.maxHeight = content.scrollHeight + 'px';
+        state.ui.collapsedSections[sectionConfig.id] = false;
+      } else {
+        section.classList.add('collapsed');
+        toggle.textContent = '▶';
+        content.style.maxHeight = '0';
+        state.ui.collapsedSections[sectionConfig.id] = true;
+      }
+      
+      saveControlSettings();
+    });
+    
+    section.appendChild(header);
+    section.appendChild(content);
+    
+    return { section, content };
+  }
+  
+  function saveControlSettings() {
+    try {
+      chrome.storage.sync.set({ 
+        collapsedSections: state.ui.collapsedSections,
+        controlsVisible: state.ui.controlsVisible
+      });
+    } catch (error) {
+      console.warn('Failed to save control settings:', error);
+    }
+  }
+  
+  async function loadControlSettings() {
+    try {
+      const data = await chrome.storage.sync.get(['collapsedSections', 'controlsVisible']);
+      state.ui.collapsedSections = data.collapsedSections || {};
+      state.ui.controlsVisible = data.controlsVisible !== undefined ? data.controlsVisible : false;
+    } catch (error) {
+      console.warn('Failed to load control settings:', error);
+      state.ui.collapsedSections = {};
+      state.ui.controlsVisible = false;
+    }
+  }
+  
+  function toggleControlsVisibility() {
+    state.ui.controlsVisible = !state.ui.controlsVisible;
+    
+    const controlsContainer = state.ui.controlsContainer;
+    const toggleBtn = document.getElementById('controls-toggle-btn');
+    
+    if (controlsContainer && toggleBtn) {
+      if (state.ui.controlsVisible) {
+        controlsContainer.classList.remove('hidden');
+        toggleBtn.textContent = '⚙️ Hide Settings';
+        toggleBtn.classList.remove('collapsed');
+      } else {
+        controlsContainer.classList.add('hidden');
+        toggleBtn.textContent = '⚙️ Show Settings';
+        toggleBtn.classList.add('collapsed');
+      }
+    }
+    
+    saveControlSettings();
+  }
+  
   function createPanel(parentElement) {
     removePanel();
     
@@ -914,6 +1034,12 @@
     state.ui.controlsContainer.id = 'lyrics-controls';
     state.ui.controlsContainer.style.position = 'relative';
     state.ui.controlsContainer.style.zIndex = '2';
+    
+    // Apply initial visibility state
+    if (!state.ui.controlsVisible) {
+      state.ui.controlsContainer.classList.add('hidden');
+    }
+    
     state.ui.panel.appendChild(state.ui.controlsContainer);
     
     state.ui.container.appendChild(state.ui.panel);
@@ -922,6 +1048,7 @@
 
   function createHeader() {
     const header = document.createElement('div');
+    header.className = 'lyrics-header';
     
     const titleContainer = document.createElement('div');
     titleContainer.id = 'lyrics-title';
@@ -929,19 +1056,27 @@
     const title = document.createElement('h3');
     title.id = 'song-title';
     title.textContent = 'Lyrics';
-    title.style.textAlign = 'center';
-    title.style.marginTop = '3vw';
-
     
     const artist = document.createElement('p');
     artist.id = 'song-artist';
     artist.textContent = '';
     artist.style.display = 'none';
-    artist.style.textAlign = 'center';
     
     titleContainer.appendChild(title);
     titleContainer.appendChild(artist);
+    
+    // Add toggle button
+    const toggleBtn = document.createElement('button');
+    toggleBtn.id = 'controls-toggle-btn';
+    toggleBtn.className = 'controls-toggle-btn';
+    toggleBtn.textContent = state.ui.controlsVisible ? '⚙️ Hide Settings' : '⚙️ Show Settings';
+    if (!state.ui.controlsVisible) {
+      toggleBtn.classList.add('collapsed');
+    }
+    toggleBtn.addEventListener('click', toggleControlsVisibility);
+    
     header.appendChild(titleContainer);
+    header.appendChild(toggleBtn);
     
     return header;
   }
@@ -1081,6 +1216,14 @@
   // ==================== CONTROL CREATORS ====================
   
   function createSongSelector(results, currentSelection) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'control-group';
+    wrapper.dataset.controlId = 'song-selector-group';
+    
+    const label = document.createElement('div');
+    label.className = 'control-label';
+    label.textContent = 'Song Selection';
+    
     const options = results.map((r, i) => ({
       value: i,
       label: `${r.trackName} - ${r.artistName}`
@@ -1096,22 +1239,27 @@
     
     select.value = currentIndex;
     
-    const label = document.createElement('label');
-    label.textContent = 'Select song: ';
-    label.style.color = 'rgba(255, 255, 255, 0.8)';
-    label.appendChild(select);
-    
-    addControl(label);
+    wrapper.appendChild(label);
+    wrapper.appendChild(select);
+    addControl(wrapper);
   }
 
   function createModeToggle(hasSynced) {
-    const existing = document.getElementById('lyrics-mode-toggle');
+    const existing = document.querySelector('[data-control-id="mode-toggle-group"]');
     if (existing) existing.remove();
     if (!hasSynced) return;
     
+    const wrapper = document.createElement('div');
+    wrapper.className = 'control-group';
+    wrapper.dataset.controlId = 'mode-toggle-group';
+    
+    const label = document.createElement('div');
+    label.className = 'control-label';
+    label.textContent = 'Playback Mode';
+    
     const options = [
-      { value: 'synced', label: '🎵 Synced' },
-      { value: 'plain', label: '📄 Plain' }
+      { value: 'synced', label: '🎵 Synced Lyrics' },
+      { value: 'plain', label: '📄 Plain Text' }
     ];
     
     const select = createSelect('lyrics-mode-toggle', options, (e) => {
@@ -1126,117 +1274,148 @@
     
     select.value = 'synced';
     
-    const label = document.createElement('label');
-    label.textContent = 'Mode: ';
-    label.style.color = 'rgba(255, 255, 255, 0.8)';
-    label.appendChild(select);
-    
-    addControl(label);
+    wrapper.appendChild(label);
+    wrapper.appendChild(select);
+    addControl(wrapper);
   }
 
   function createDelayControl() {
-    const existing = document.getElementById('delay-control');
+    const existing = document.querySelector('[data-control-id="delay-control-group"]');
     if (existing) existing.remove();
     
-    const container = document.createElement('div');
-    container.id = 'delay-control';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'control-group';
+    wrapper.dataset.controlId = 'delay-control-group';
     
-    const label = document.createElement('span');
-    label.textContent = 'Delay: ';
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'control-label-row';
+    labelDiv.innerHTML = '<span class="control-label">Sync Offset</span>';
     
     const display = document.createElement('span');
-    display.id = 'delay-display';
-    display.textContent = '0ms';
+    display.className = 'delay-display';
+    display.textContent = `${state.sync.delay}ms`;
+    labelDiv.appendChild(display);
     
-    function updateDisplay() {
-      display.textContent = `${state.sync.delay}ms`;
-    }
+    const sliderWrapper = document.createElement('div');
+    sliderWrapper.className = 'slider-wrapper';
     
-    const decreaseBtn = createButton('-100ms', () => {
-      state.sync.delay -= 100;
-      updateDisplay();
-    });
-    
-    const increaseBtn = createButton('+100ms', () => {
-      state.sync.delay += 100;
-      updateDisplay();
-    });
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.id = 'delay-slider';
+    slider.className = 'delay-slider';
+    slider.min = '-1000';
+    slider.max = '1000';
+    slider.step = '50';
+    slider.value = state.sync.delay;
     
     const resetBtn = createButton('Reset', () => {
       state.sync.delay = 0;
-      updateDisplay();
+      slider.value = 0;
+      display.textContent = '0ms';
+    });
+    resetBtn.className = 'lyrics-button lyrics-button-small';
+    
+    slider.addEventListener('input', (e) => {
+      state.sync.delay = parseInt(e.target.value);
+      display.textContent = `${state.sync.delay}ms`;
     });
     
-    container.appendChild(label);
-    container.appendChild(decreaseBtn);
-    container.appendChild(display);
-    container.appendChild(increaseBtn);
-    container.appendChild(resetBtn);
+    sliderWrapper.appendChild(slider);
     
-    addControl(container);
+    wrapper.appendChild(labelDiv);
+    wrapper.appendChild(sliderWrapper);
+    wrapper.appendChild(resetBtn);
+    
+    addControl(wrapper);
   }
 
   function createBackgroundControl() {
-    const existing = document.getElementById('background-control');
+    const existing = document.querySelector('[data-control-id="background-control-group"]');
     if (existing) existing.remove();
     
-    const container = document.createElement('div');
-    container.id = 'background-control';
-    container.style.display = 'flex';
-    container.style.gap = '0.5rem';
-    container.style.flexWrap = 'wrap';
-    container.style.alignItems = 'center';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'control-group';
+    wrapper.dataset.controlId = 'background-control-group';
     
-    const label = document.createElement('span');
-    label.textContent = 'Background: ';
+    const modeLabel = document.createElement('div');
+    modeLabel.className = 'control-label';
+    modeLabel.textContent = 'Background Style';
     
-    const options = [
-      { value: 'none', label: '⬛ None' },
-      { value: 'gradient', label: '🎨 Gradient' },
-      { value: 'album', label: '🖼️ Album Art' },
-      { value: 'video', label: '🎬 Video Blur' }
+    const modeGrid = document.createElement('div');
+    modeGrid.className = 'background-mode-grid';
+    
+    const modes = [
+      { value: 'none', icon: '⬛', label: 'None' },
+      { value: 'gradient', icon: '🎨', label: 'Gradient' },
+      { value: 'album', icon: '🖼️', label: 'Album' },
+      { value: 'video', icon: '🎬', label: 'Video' }
     ];
     
-    const select = createSelect('background-mode-select', options, async (e) => {
-      state.background.mode = e.target.value;
-      saveBackgroundSettings();
-      
-      // Show/hide gradient theme selector
-      const themeControl = document.getElementById('gradient-theme-control');
-      if (e.target.value === 'gradient' && themeControl) {
-        themeControl.style.display = 'flex';
-      } else if (themeControl) {
-        themeControl.style.display = 'none';
+    modes.forEach(mode => {
+      const btn = document.createElement('button');
+      btn.className = 'background-mode-btn';
+      btn.dataset.mode = mode.value;
+      if (state.background.mode === mode.value) {
+        btn.classList.add('active');
       }
       
-      await updateBackground();
+      const icon = document.createElement('span');
+      icon.className = 'mode-icon';
+      icon.textContent = mode.icon;
+      
+      const label = document.createElement('span');
+      label.className = 'mode-label';
+      label.textContent = mode.label;
+      
+      btn.appendChild(icon);
+      btn.appendChild(label);
+      
+      btn.addEventListener('click', async () => {
+        modeGrid.querySelectorAll('.background-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        state.background.mode = mode.value;
+        saveBackgroundSettings();
+        
+        const themeContainer = wrapper.querySelector('.gradient-theme-container');
+        if (mode.value === 'gradient' && themeContainer) {
+          themeContainer.style.display = 'block';
+          setTimeout(() => themeContainer.classList.add('visible'), 10);
+        } else if (themeContainer) {
+          themeContainer.classList.remove('visible');
+          setTimeout(() => themeContainer.style.display = 'none', 300);
+        }
+        
+        await updateBackground();
+      });
+      
+      modeGrid.appendChild(btn);
     });
     
-    select.value = state.background.mode;
+    wrapper.appendChild(modeLabel);
+    wrapper.appendChild(modeGrid);
     
-    container.appendChild(label);
-    container.appendChild(select);
+    createGradientThemeControl(wrapper);
     
-    addControl(container);
-    
-    // Add gradient theme selector
-    createGradientThemeControl();
+    addControl(wrapper);
   }
 
-  function createGradientThemeControl() {
-    const existing = document.getElementById('gradient-theme-control');
-    if (existing) existing.remove();
-    
+  function createGradientThemeControl(parentWrapper) {
     const container = document.createElement('div');
-    container.id = 'gradient-theme-control';
-    container.style.display = state.background.mode === 'gradient' ? 'flex' : 'none';
-    container.style.gap = '0.5rem';
-    container.style.alignItems = 'center';
+    container.className = 'gradient-theme-container';
+    container.style.display = state.background.mode === 'gradient' ? 'block' : 'none';
     
-    const label = document.createElement('span');
-    label.textContent = 'Theme: ';
+    if (state.background.mode === 'gradient') {
+      setTimeout(() => container.classList.add('visible'), 10);
+    }
     
-    // Build options from presets
+    const label = document.createElement('div');
+    label.className = 'control-label';
+    label.textContent = 'Gradient Theme';
+    
+    const controlRow = document.createElement('div');
+    controlRow.className = 'gradient-theme-row';
+    
     const options = [
       { value: 'random', label: '🎲 Random' },
       ...CONSTANTS.PRESET_GRADIENTS.map(preset => ({ 
@@ -1252,23 +1431,22 @@
     });
     
     select.value = state.background.gradientTheme;
-    select.style.minWidth = '120px';
     
-    // Add refresh button for random
     const refreshBtn = createButton('🔄', async () => {
       if (state.background.gradientTheme === 'random') {
         await updateBackground();
       }
     });
+    refreshBtn.className = 'lyrics-button lyrics-button-icon';
     refreshBtn.title = 'Generate new random gradient';
-    refreshBtn.style.minWidth = '2.5rem';
-    refreshBtn.style.padding = '0.5rem';
+    
+    controlRow.appendChild(select);
+    controlRow.appendChild(refreshBtn);
     
     container.appendChild(label);
-    container.appendChild(select);
-    container.appendChild(refreshBtn);
+    container.appendChild(controlRow);
     
-    addControl(container);
+    parentWrapper.appendChild(container);
   }
 
   // ==================== MAIN LOGIC ====================
@@ -1295,11 +1473,9 @@
     try {
       showLoading();
       
-      // Load background settings
+      // Load background and control settings first
       await loadBackgroundSettings();
-      
-      // Update background with video thumbnail
-      await updateBackground();
+      await loadControlSettings();
       
       let results = await searchLyrics(videoInfo.formattedTitle);
       
@@ -1336,6 +1512,11 @@
     
     createModeToggle(synced.length > 0);
     createBackgroundControl();
+    
+    // Update background after controls are created to ensure proper state
+    setTimeout(() => {
+      updateBackground();
+    }, 100);
     
     if (synced.length > 0) {
       initSyncedLyrics(synced);
@@ -1425,6 +1606,11 @@
     
     // Stop sync and cancel animation frame
     stopSync();
+    
+    // Clear background cache to force reload on new video
+    state.background.imageUrl = null;
+    state.background.dominantColor = null;
+    state.background.element = null;
     
     // Clear state
     state.hasRun = false;
