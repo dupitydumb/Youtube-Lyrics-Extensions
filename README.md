@@ -4,7 +4,21 @@
 ![Manifest](https://img.shields.io/badge/manifest-v3-green)
 ![Chrome](https://img.shields.io/badge/chrome-extension-orange)
 
-A Chrome extension that displays synchronized lyrics for YouTube videos with a beautiful Apple Music-style interface.
+A Chrome extension that displays synchronized lyrics for YouTube videos with a beautiful, modern interface.
+
+## 📸 Screenshots
+
+<!-- Add screenshots here -->
+![Feature Showcase 1](path/to/screenshot1.png)
+*Description of feature*
+
+![Feature Showcase 2](path/to/screenshot2.png)
+*Description of feature*
+
+![Fullscreen Mode](path/to/fullscreen.png)
+*Lyrics seamlessly integrated in fullscreen mode*
+
+---
 
 <img width="1339" height="639" alt="image" src="https://github.com/user-attachments/assets/9fb6100b-8520-4105-a388-373c64408a77" />
 
@@ -12,11 +26,12 @@ A Chrome extension that displays synchronized lyrics for YouTube videos with a b
 ## ✨ Features
 
 ### 🎵 Lyrics Display
-- **Apple Music-Style UI** - Beautiful centered lyrics with smooth animations
+- **Modern UI** - Beautiful centered lyrics with smooth animations
 - **Dynamic Font Scaling** - Current lyric is larger and highlighted
 - **Auto-Sync** - Lyrics automatically synchronize with video playback
 - **Interactive Seeking** - Click any lyric line to jump to that timestamp
 - **Smart Scrolling** - Smooth auto-scroll keeps current lyric centered
+- **Fullscreen Support** - Enjoy lyrics in YouTube's fullscreen mode with seamless integration
 
 ### 🎨 Visual Effects
 - **Blur Background** - Semi-transparent backdrop with blur effect
@@ -125,7 +140,8 @@ A Chrome extension that displays synchronized lyrics for YouTube videos with a b
 See [CHANGELOG-V2.md](CHANGELOG-V2.md) for detailed version history and improvements.
 
 ### Version 2.0 Highlights
-- ✅ Complete UI redesign with Apple Music-style interface
+- ✅ Complete UI redesign with modern, clean interface
+- ✅ Fullscreen mode support for immersive viewing experience
 - ✅ Critical bug fixes in search and sync functions
 - ✅ Performance optimizations with binary search
 - ✅ Interactive lyric seeking
