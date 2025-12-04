@@ -548,6 +548,7 @@
         rgba(0,0,0,0.5) 100%);
       animation: vinyl-spin 8s linear infinite;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      filter: blur(1px);
     `;
     
     // Create album cover in center
