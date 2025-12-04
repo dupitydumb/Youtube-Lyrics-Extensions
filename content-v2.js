@@ -439,6 +439,113 @@
     return colors;
   }
 
+  function createVinylDiscBackgroundFullscreen(container, imageUrl) {
+    // Create blurred background
+    const bgBlur = document.createElement('div');
+    bgBlur.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: url('${imageUrl}');
+      background-size: cover;
+      background-position: center;
+      filter: blur(60px) brightness(0.3);
+      z-index: 0;
+    `;
+    
+    // Create vinyl disc container - larger for fullscreen, positioned to the left
+    const vinylContainer = document.createElement('div');
+    vinylContainer.className = 'vinyl-disc-container-fullscreen';
+    vinylContainer.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: -30%;
+      transform: translateY(-50%);
+      width: 1000px;
+      height: 1000px;
+      z-index: 1;
+      opacity: 0.4;
+    `;
+    
+    // Create vinyl disc
+    const vinyl = document.createElement('div');
+    vinyl.className = 'vinyl-disc';
+    vinyl.style.cssText = `
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, 
+        transparent 0%, 
+        transparent 25%, 
+        rgba(0,0,0,0.3) 25%, 
+        rgba(0,0,0,0.5) 30%,
+        rgba(0,0,0,0.3) 30%,
+        rgba(0,0,0,0.5) 100%);
+      animation: vinyl-spin 8s linear infinite;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      filter: blur(1px);
+    `;
+    
+    // Create album cover in center
+    const albumCover = document.createElement('div');
+    albumCover.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60%;
+      height: 60%;
+      border-radius: 50%;
+      background-image: url('${imageUrl}');
+      background-size: cover;
+      background-position: center;
+      box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.8),
+                  inset 0 4px 12px rgba(0, 0, 0, 0.5);
+    `;
+    
+    // Create center hole
+    const centerHole = document.createElement('div');
+    centerHole.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20%;
+      height: 20%;
+      border-radius: 50%;
+      background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8),
+                  inset 0 1px 4px rgba(255, 255, 255, 0.1);
+    `;
+    
+    // Add shine effect
+    const shine = document.createElement('div');
+    shine.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, 
+        rgba(255,255,255,0.1) 0%, 
+        transparent 50%, 
+        rgba(255,255,255,0.05) 100%);
+      pointer-events: none;
+    `;
+    
+    vinyl.appendChild(albumCover);
+    vinyl.appendChild(centerHole);
+    vinyl.appendChild(shine);
+    vinylContainer.appendChild(vinyl);
+    
+    container.appendChild(bgBlur);
+    container.appendChild(vinylContainer);
+  }
+
   function createAnimatedGradientBlobs(container, colors) {
     if (!container) return;
     
@@ -725,14 +832,23 @@
     const bgLayer = document.createElement('div');
     bgLayer.className = 'lyrics-fullscreen-background';
     
+    // Get thumbnail for album/video/vinyl modes
+    const thumbnailUrl = state.background.imageUrl || extractVideoThumbnail();
+    
     // Apply current background mode
     const mode = state.background.mode;
     if (mode === 'gradient') {
       const colors = getGradientColors();
       createAnimatedGradientBlobs(bgLayer, colors);
       bgLayer.style.background = `linear-gradient(135deg, rgba(10, 10, 15, 0.85) 0%, rgba(5, 5, 10, 0.95) 100%)`;
-    } else if (mode === 'album' || mode === 'video') {
-      const thumbnailUrl = state.background.imageUrl || extractVideoThumbnail();
+    } else if (mode === 'album') {
+      // Create vinyl disc effect for fullscreen
+      if (thumbnailUrl) {
+        createVinylDiscBackgroundFullscreen(bgLayer, thumbnailUrl);
+      } else {
+        bgLayer.style.background = 'rgba(0, 0, 0, 0.92)';
+      }
+    } else if (mode === 'video') {
       if (thumbnailUrl) {
         bgLayer.style.backgroundImage = `url('${thumbnailUrl}')`;
         bgLayer.style.backgroundSize = 'cover';
@@ -1301,10 +1417,10 @@
       settingsBtn.setAttribute('title', 'Lyrics Settings: ' + (state.ui.controlsVisible ? 'ON' : 'OFF'));
     });
     
-    // Assemble container
+    // Assemble container - settings toggle first, then fullscreen
     container.appendChild(label);
-    container.appendChild(fullscreenBtn);
     container.appendChild(settingsBtn);
+    container.appendChild(fullscreenBtn);
     
     // Insert at the beginning of right controls (before settings gear)
     rightControls.insertBefore(container, rightControls.firstChild);
