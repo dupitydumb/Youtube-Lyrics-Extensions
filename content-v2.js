@@ -181,7 +181,10 @@
       lyricsContainer: null,
       controlsContainer: null,
       collapsedSections: {},
-      controlsVisible: false
+      controlsVisible: false,
+      fullscreenMode: false,
+      fullscreenOverlay: null,
+      keyboardHandler: null
     },
     cache: new Map()
   };
@@ -436,15 +439,13 @@
     return colors;
   }
 
-  function createAnimatedGradientBlobs(colors) {
-    const container = state.background.element;
+  function createAnimatedGradientBlobs(container, colors) {
     if (!container) return;
     
     // Clear existing blobs
     container.innerHTML = '';
     
     // Create multiple blob elements
-    const blobs = [];
     const blobCount = 4;
     
     for (let i = 0; i < blobCount; i++) {
@@ -467,7 +468,6 @@
       `;
       
       container.appendChild(blob);
-      blobs.push(blob);
     }
     
     // Inject keyframes for each blob
@@ -676,7 +676,7 @@
       console.log('Using gradient colors:', colors);
       
       // Create animated gradient blobs
-      createAnimatedGradientBlobs(colors);
+      createAnimatedGradientBlobs(bgLayer, colors);
       
       // Add base gradient background
       bgLayer.style.background = `linear-gradient(135deg, rgba(20, 20, 25, 0.6) 0%, rgba(10, 10, 15, 0.8) 100%)`;
@@ -710,6 +710,227 @@
         console.log('Background updated successfully with new thumbnail');
       } else {
         console.warn('No thumbnail URL found');
+      }
+    }
+  }
+
+  // ==================== FULLSCREEN FUNCTIONS ====================
+
+  function createFullscreenOverlay() {
+    const overlay = document.createElement('div');
+    overlay.id = 'lyrics-fullscreen-overlay';
+    overlay.className = 'lyrics-fullscreen-overlay';
+    
+    // Create background layer for fullscreen
+    const bgLayer = document.createElement('div');
+    bgLayer.className = 'lyrics-fullscreen-background';
+    
+    // Apply current background mode
+    const mode = state.background.mode;
+    if (mode === 'gradient') {
+      const colors = getGradientColors();
+      createAnimatedGradientBlobs(bgLayer, colors);
+      bgLayer.style.background = `linear-gradient(135deg, rgba(10, 10, 15, 0.85) 0%, rgba(5, 5, 10, 0.95) 100%)`;
+    } else if (mode === 'album' || mode === 'video') {
+      const thumbnailUrl = state.background.imageUrl || extractVideoThumbnail();
+      if (thumbnailUrl) {
+        bgLayer.style.backgroundImage = `url('${thumbnailUrl}')`;
+        bgLayer.style.backgroundSize = 'cover';
+        bgLayer.style.backgroundPosition = 'center';
+        bgLayer.style.filter = 'blur(40px) brightness(0.3)';
+      }
+    } else {
+      bgLayer.style.background = 'rgba(0, 0, 0, 0.92)';
+    }
+    
+    // Create lyrics container for fullscreen
+    const lyricsContainer = document.createElement('div');
+    lyricsContainer.id = 'lyrics-fullscreen-display';
+    lyricsContainer.className = 'lyrics-fullscreen-display';
+    
+    // Create exit hint
+    const exitHint = document.createElement('div');
+    exitHint.className = 'lyrics-fullscreen-hint';
+    exitHint.innerHTML = 'Press <kbd>ESC</kbd> or <kbd>F</kbd> to exit fullscreen';
+    
+    overlay.appendChild(bgLayer);
+    overlay.appendChild(lyricsContainer);
+    overlay.appendChild(exitHint);
+    
+    return { overlay, lyricsContainer };
+  }
+
+  function createAnimatedGradientBlobs(container, colors) {
+    // Clear existing blobs
+    container.innerHTML = '';
+    
+    // Create multiple blob elements
+    const blobCount = 4;
+    
+    for (let i = 0; i < blobCount; i++) {
+      const blob = document.createElement('div');
+      blob.className = 'gradient-blob';
+      
+      const size = 400 + Math.random() * 300;
+      const color = colors[i % colors.length];
+      
+      blob.style.cssText = `
+        position: absolute;
+        width: ${size}px;
+        height: ${size}px;
+        background: ${color};
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.7;
+        animation: blob-float-${i} ${15 + i * 3}s ease-in-out infinite;
+        animation-delay: ${i * -2}s;
+      `;
+      
+      container.appendChild(blob);
+    }
+  }
+
+  function toggleFullscreenMode() {
+    if (state.ui.fullscreenMode) {
+      exitFullscreenMode();
+    } else {
+      enterFullscreenMode();
+    }
+  }
+
+  function enterFullscreenMode() {
+    if (!state.syncedLyrics || state.syncedLyrics.length === 0) {
+      console.warn('No synced lyrics available for fullscreen mode');
+      return;
+    }
+    
+    // Create fullscreen overlay
+    const { overlay, lyricsContainer } = createFullscreenOverlay();
+    state.ui.fullscreenOverlay = overlay;
+    
+    // Store reference to fullscreen lyrics container
+    const originalContainer = state.ui.lyricsContainer;
+    state.ui.lyricsContainer = lyricsContainer;
+    
+    // Render lyrics in fullscreen
+    displaySyncedLyrics(state.syncedLyrics);
+    
+    // Update current lyric if sync is active
+    if (state.sync.currentIndex >= 0) {
+      updateCurrentLyric(state.sync.currentIndex);
+    }
+    
+    // Add to DOM
+    document.body.appendChild(overlay);
+    
+    // Fade in
+    requestAnimationFrame(() => {
+      overlay.style.opacity = '1';
+    });
+    
+    // Hide YouTube video player (dim it)
+    const moviePlayer = document.querySelector('#movie_player');
+    if (moviePlayer) {
+      moviePlayer.style.opacity = '0.1';
+      moviePlayer.style.pointerEvents = 'none';
+    }
+    
+    // Setup keyboard handler
+    state.ui.keyboardHandler = (e) => {
+      if (e.key === 'Escape' || e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        exitFullscreenMode();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (state.sync.currentIndex > 0) {
+          seekToLyric(state.sync.currentIndex - 1);
+        }
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (state.sync.currentIndex < state.syncedLyrics.length - 1) {
+          seekToLyric(state.sync.currentIndex + 1);
+        }
+      } else if (e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        if (state.sync.videoElement) {
+          if (state.sync.videoElement.paused) {
+            state.sync.videoElement.play();
+          } else {
+            state.sync.videoElement.pause();
+          }
+        }
+      }
+    };
+    
+    document.addEventListener('keydown', state.ui.keyboardHandler);
+    
+    state.ui.fullscreenMode = true;
+    
+    // Update fullscreen button if exists
+    updateFullscreenButton();
+  }
+
+  function exitFullscreenMode() {
+    if (!state.ui.fullscreenMode || !state.ui.fullscreenOverlay) return;
+    
+    const overlay = state.ui.fullscreenOverlay;
+    
+    // Fade out
+    overlay.style.opacity = '0';
+    
+    setTimeout(() => {
+      // Remove from DOM
+      if (overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+      
+      // Restore YouTube video player
+      const moviePlayer = document.querySelector('#movie_player');
+      if (moviePlayer) {
+        moviePlayer.style.opacity = '1';
+        moviePlayer.style.pointerEvents = 'auto';
+      }
+      
+      // Restore original lyrics container
+      const panelLyricsContainer = document.getElementById('lyrics-display');
+      if (panelLyricsContainer) {
+        state.ui.lyricsContainer = panelLyricsContainer;
+        
+        // Re-render lyrics in panel
+        displaySyncedLyrics(state.syncedLyrics);
+        
+        // Update current lyric
+        if (state.sync.currentIndex >= 0) {
+          updateCurrentLyric(state.sync.currentIndex);
+        }
+      }
+      
+      state.ui.fullscreenOverlay = null;
+    }, 300);
+    
+    // Remove keyboard handler
+    if (state.ui.keyboardHandler) {
+      document.removeEventListener('keydown', state.ui.keyboardHandler);
+      state.ui.keyboardHandler = null;
+    }
+    
+    state.ui.fullscreenMode = false;
+    
+    // Update fullscreen button if exists
+    updateFullscreenButton();
+  }
+
+  function updateFullscreenButton() {
+    const btn = document.getElementById('lyrics-fullscreen-btn');
+    if (btn) {
+      if (state.ui.fullscreenMode) {
+        btn.textContent = '🚪';
+        btn.setAttribute('title', 'Exit Fullscreen (ESC)');
+        btn.style.color = '#667eea';
+      } else {
+        btn.textContent = '🎤';
+        btn.setAttribute('title', 'Fullscreen Karaoke (F)');
+        btn.style.color = 'white';
       }
     }
   }
@@ -1014,10 +1235,10 @@
   }
 
   function createVideoPlayerButton() {
-    // Remove existing button if present
-    const existingBtn = document.getElementById('lyrics-video-settings-btn');
-    if (existingBtn) {
-      existingBtn.remove();
+    // Remove existing buttons if present
+    const existingContainer = document.getElementById('lyrics-video-settings-container');
+    if (existingContainer) {
+      existingContainer.remove();
     }
 
     // Find YouTube's video controls container
@@ -1027,7 +1248,7 @@
       return;
     }
 
-    // Create container for button with label
+    // Create container for buttons
     const container = document.createElement('div');
     container.id = 'lyrics-video-settings-container';
     container.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-right: 8px;';
@@ -1037,34 +1258,58 @@
     label.textContent = '🎵';
     label.style.cssText = 'font-size: 18px; opacity: 0.9; user-select: none; pointer-events: none;';
     
+    // Create fullscreen karaoke button
+    const fullscreenBtn = document.createElement('button');
+    fullscreenBtn.id = 'lyrics-fullscreen-btn';
+    fullscreenBtn.className = 'ytp-button';
+    fullscreenBtn.setAttribute('aria-label', 'Fullscreen Karaoke');
+    fullscreenBtn.setAttribute('title', 'Fullscreen Karaoke (F)');
+    fullscreenBtn.setAttribute('data-control-id', 'fullscreen-btn');
+    fullscreenBtn.style.cssText = 'width: 32px; height: 32px; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none; color: white; opacity: 0.9;';
+    fullscreenBtn.textContent = '🎤';
+    
+    fullscreenBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFullscreenMode();
+    });
+    
+    fullscreenBtn.addEventListener('mouseenter', () => {
+      fullscreenBtn.style.opacity = '1';
+    });
+    
+    fullscreenBtn.addEventListener('mouseleave', () => {
+      fullscreenBtn.style.opacity = '0.9';
+    });
+    
     // Create toggle switch button (styled in CSS)
-    const btn = document.createElement('button');
-    btn.id = 'lyrics-video-settings-btn';
-    btn.setAttribute('aria-label', 'Lyrics Settings');
-    btn.setAttribute('title', 'Lyrics Settings: ' + (state.ui.controlsVisible ? 'ON' : 'OFF'));
-    btn.setAttribute('aria-pressed', state.ui.controlsVisible ? 'true' : 'false');
-    btn.setAttribute('role', 'switch');
+    const settingsBtn = document.createElement('button');
+    settingsBtn.id = 'lyrics-video-settings-btn';
+    settingsBtn.setAttribute('aria-label', 'Lyrics Settings');
+    settingsBtn.setAttribute('title', 'Lyrics Settings: ' + (state.ui.controlsVisible ? 'ON' : 'OFF'));
+    settingsBtn.setAttribute('aria-pressed', state.ui.controlsVisible ? 'true' : 'false');
+    settingsBtn.setAttribute('role', 'switch');
     
     if (state.ui.controlsVisible) {
-      btn.classList.add('active');
+      settingsBtn.classList.add('active');
     }
     
     // Add click handler
-    btn.addEventListener('click', (e) => {
+    settingsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleControlsVisibility();
       // Update tooltip
-      btn.setAttribute('title', 'Lyrics Settings: ' + (state.ui.controlsVisible ? 'ON' : 'OFF'));
+      settingsBtn.setAttribute('title', 'Lyrics Settings: ' + (state.ui.controlsVisible ? 'ON' : 'OFF'));
     });
     
     // Assemble container
     container.appendChild(label);
-    container.appendChild(btn);
+    container.appendChild(fullscreenBtn);
+    container.appendChild(settingsBtn);
     
     // Insert at the beginning of right controls (before settings gear)
     rightControls.insertBefore(container, rightControls.firstChild);
     
-    console.log('Lyrics settings button added to video controls');
+    console.log('Lyrics controls added to video controls');
   }
   
   function createPanel(parentElement) {
@@ -1206,24 +1451,29 @@
     if (!state.ui.lyricsContainer) return;
     
     const lines = state.ui.lyricsContainer.querySelectorAll('.lyric-line');
+    const isFullscreen = state.ui.fullscreenMode;
+    
+    // Show more lines in fullscreen mode
+    const contextLines = isFullscreen ? 3 : 1;
     
     lines.forEach((line, index) => {
       const isCurrent = index === currentIndex;
-      const isPrevious = index === currentIndex - 1;
-      const isNext = index === currentIndex + 1;
+      const distance = Math.abs(index - currentIndex);
+      const isPast = index < currentIndex && distance <= contextLines;
+      const isFuture = index > currentIndex && distance <= contextLines;
       
       // Remove all state classes first
       line.classList.remove('current', 'past', 'future');
       
-      // Show only current, previous, and next lines
-      if (isCurrent || isPrevious || isNext) {
+      // Show current and nearby lines based on context
+      if (isCurrent || isPast || isFuture) {
         line.style.display = 'block';
         
         if (isCurrent) {
           line.classList.add('current');
-        } else if (isPrevious) {
+        } else if (isPast) {
           line.classList.add('past');
-        } else if (isNext) {
+        } else if (isFuture) {
           line.classList.add('future');
         }
       } else {
@@ -1653,6 +1903,11 @@
   }
 
   function resetState() {
+    // Exit fullscreen mode if active
+    if (state.ui.fullscreenMode) {
+      exitFullscreenMode();
+    }
+    
     // Clean up video event listeners
     if (state.sync.videoElement) {
       if (state.sync.handlePlay) {
