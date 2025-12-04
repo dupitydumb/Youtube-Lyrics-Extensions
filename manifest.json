@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Youtube Lyrics",
+  "version": "2.0",
+  "description": "Display synchronized lyrics for YouTube videos with Apple Music-style interface.",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["https://lrclib.net/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "images/icon.png"
+  },
+  "icons": {
+    "16": "images/icon.png",
+    "48": "images/icon.png",
+    "128": "images/icon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["content-v2.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
