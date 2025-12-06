@@ -263,6 +263,9 @@ export class LyricsUI {
   displaySyncedLyrics(syncedLyrics) {
     if (!this.lyricsContainer) return;
 
+    // Clear cache when displaying new lyrics
+    this._cachedLines = null;
+
     // Clear using replaceChildren for Trusted Types compatibility
     this.lyricsContainer.replaceChildren();
     const styles = UI_CONFIG.APPLE_MUSIC_STYLE;
@@ -364,73 +367,89 @@ export class LyricsUI {
   /**
    * Update current lyric highlight with smooth animations
    */
-  updateCurrentLyric(currentIndex, currentTime = null) {
+  updateCurrentLyric(currentIndex, currentTime = null, indexChanged = true) {
     if (!this.lyricsContainer) return;
 
     const styles = UI_CONFIG.APPLE_MUSIC_STYLE;
-    const lyricLines = this.lyricsContainer.querySelectorAll('.lyric-line');
+    
+    // Only query DOM when index changes for performance
+    if (indexChanged || !this._cachedLines) {
+      this._cachedLines = this.lyricsContainer.querySelectorAll('.lyric-line');
+    }
+    
+    const lyricLines = this._cachedLines;
+    
+    // Batch DOM updates in requestAnimationFrame for smoothness
+    if (indexChanged) {
+      requestAnimationFrame(() => {
+        lyricLines.forEach((line, index) => {
+          const isPast = index < currentIndex;
+          const isCurrent = index === currentIndex;
+          const isFuture = index > currentIndex;
 
-    lyricLines.forEach((line, index) => {
-      const isPast = index < currentIndex;
-      const isCurrent = index === currentIndex;
-      const isFuture = index > currentIndex;
+          if (isCurrent) {
+            line.classList.add('current');
+            Object.assign(line.style, {
+              color: '#ffffff',
+              fontWeight: '600',
+              transform: 'translateZ(0) scale(1.5)',
+              transformOrigin: 'center',
+              textShadow: '0 2px 12px rgba(255, 255, 255, 0.3)',
+              margin: '16px 0',
+              transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, margin 0.3s ease, font-size 0.3s ease'
+            });
 
-      if (isCurrent) {
-        line.classList.add('current');
-        Object.assign(line.style, {
-          color: '#ffffff',
-          fontWeight: '600',
-          transform: 'scale(1.5)',
-          transformOrigin: 'center',
-          textShadow: '0 2px 12px rgba(255, 255, 255, 0.3)',
-          margin: '16px 0'
-        });
+            // Debounced scroll - only on index change
+            if (!this._scrollTimeout) {
+              const containerHeight = this.lyricsContainer.clientHeight;
+              const lineTop = line.offsetTop;
+              const lineHeight = line.offsetHeight;
+              const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
+              
+              this.lyricsContainer.scrollTo({
+                top: scrollPosition,
+                behavior: 'smooth'
+              });
+            }
 
-        // Update word-by-word highlighting if available
-        if (currentTime !== null) {
-          this.updateWordHighlight(line, currentTime);
-        }
-
-        // Smooth scroll to current lyric
-        setTimeout(() => {
-          const containerHeight = this.lyricsContainer.clientHeight;
-          const lineTop = line.offsetTop;
-          const lineHeight = line.offsetHeight;
-          const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
-          
-          this.lyricsContainer.scrollTo({
-            top: scrollPosition,
-            behavior: 'smooth'
-          });
-        }, 0);
-
-      } else {
-        line.classList.remove('current');
-        Object.assign(line.style, {
-          fontWeight: '400',
-          transform: isPast ? 'scale(0.95)' : 'scale(1)',
-          transformOrigin: 'center',
-          textShadow: 'none',
-          margin: '0',
-          color: isPast 
-            ? `rgba(255, 255, 255, ${styles.PAST_LINE_OPACITY})` 
-            : `rgba(255, 255, 255, ${styles.FUTURE_LINE_OPACITY})`
-        });
-        
-        // Reset word highlighting for non-current lines
-        const words = line.querySelectorAll('.lyric-word');
-        words.forEach(word => {
-          word.classList.remove('highlighted');
-          if (isPast) {
-            word.classList.remove('future');
-            word.classList.add('past');
           } else {
-            word.classList.remove('past');
-            word.classList.add('future');
+            line.classList.remove('current');
+            Object.assign(line.style, {
+              fontWeight: '400',
+              transform: isPast ? 'translateZ(0) scale(0.95)' : 'translateZ(0) scale(1)',
+              transformOrigin: 'center',
+              textShadow: 'none',
+              margin: '0',
+              transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, margin 0.3s ease, font-size 0.3s ease',
+              color: isPast 
+                ? `rgba(255, 255, 255, ${styles.PAST_LINE_OPACITY})` 
+                : `rgba(255, 255, 255, ${styles.FUTURE_LINE_OPACITY})`
+            });
+            
+            // Reset word highlighting for non-current lines
+            const words = line.querySelectorAll('.lyric-word');
+            words.forEach(word => {
+              word.classList.remove('highlighted');
+              if (isPast) {
+                word.classList.remove('future');
+                word.classList.add('past');
+              } else {
+                word.classList.remove('past');
+                word.classList.add('future');
+              }
+            });
           }
         });
+      });
+    }
+    
+    // Word-level updates (happens every frame for word mode)
+    if (currentTime !== null) {
+      const currentLine = lyricLines[currentIndex];
+      if (currentLine) {
+        this.updateWordHighlight(currentLine, currentTime);
       }
-    });
+    }
   }
 
   /**

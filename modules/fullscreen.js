@@ -253,6 +253,9 @@ export class FullscreenManager {
   displayLyricsInFullscreen(lyrics) {
     if (!this.lyricsContainer) return;
     
+    // Clear cache when displaying new lyrics
+    this._cachedFullscreenLines = null;
+    
     this.lyricsContainer.replaceChildren();
     
     // Create wrapper for proper centering and scrolling
@@ -361,98 +364,110 @@ export class FullscreenManager {
   /**
    * Update current lyric highlight in fullscreen
    */
-  updateCurrentLyric(currentIndex, currentTime) {
+  updateCurrentLyric(currentIndex, currentTime, indexChanged = true) {
     if (!this.lyricsContainer) return;
 
-    const lyricLines = this.lyricsContainer.querySelectorAll('.fullscreen-lyric-line');
+    // Cache lines for performance
+    if (indexChanged || !this._cachedFullscreenLines) {
+      this._cachedFullscreenLines = this.lyricsContainer.querySelectorAll('.fullscreen-lyric-line');
+    }
+    
+    const lyricLines = this._cachedFullscreenLines;
 
-    lyricLines.forEach((line, index) => {
-      const isPast = index < currentIndex;
-      const isCurrent = index === currentIndex;
+    // Batch DOM updates in RAF for smoothness
+    if (indexChanged) {
+      requestAnimationFrame(() => {
+        lyricLines.forEach((line, index) => {
+          const isPast = index < currentIndex;
+          const isCurrent = index === currentIndex;
 
-      if (isCurrent) {
-        line.classList.add('current');
-        line.classList.remove('past', 'future');
-        line.style.cssText = `
-          color: #ffffff !important;
-          font-size: 48px !important;
-          font-weight: 700 !important;
-          transform: translateZ(0) !important;
-          text-shadow: 0 0 20px rgba(255, 255, 255, 0.5), 0 2px 12px rgba(255, 255, 255, 0.3) !important;
-          padding: 20px 30px !important;
-          line-height: 1.8 !important;
-          text-align: center !important;
-          cursor: pointer !important;
-          transition: font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, text-shadow 0.3s ease !important;
-          opacity: 1 !important;
-          will-change: font-size, color !important;
-        `;
+          if (isCurrent) {
+            line.classList.add('current');
+            line.classList.remove('past', 'future');
+            line.style.cssText = `
+              color: #ffffff !important;
+              font-size: 48px !important;
+              font-weight: 700 !important;
+              transform: translateZ(0) !important;
+              text-shadow: 0 0 20px rgba(255, 255, 255, 0.5), 0 2px 12px rgba(255, 255, 255, 0.3) !important;
+              padding: 20px 30px !important;
+              line-height: 1.8 !important;
+              text-align: center !important;
+              cursor: pointer !important;
+              transition: font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, text-shadow 0.3s ease !important;
+              opacity: 1 !important;
+              will-change: font-size, color !important;
+            `;
 
-        // Update word-by-word highlighting if available and in word mode
-        if (currentTime !== null && this.highlightMode === 'word') {
-          const words = line.querySelectorAll('.lyric-word');
-          words.forEach(word => {
-            const wordTime = parseFloat(word.dataset.wordTime);
-            
-            if (!isNaN(wordTime)) {
-              const timeDiff = currentTime - wordTime;
+            // Debounced scroll - only on index change
+            if (!this._scrollTimeout) {
+              const containerRect = this.lyricsContainer.getBoundingClientRect();
+              const lineRect = line.getBoundingClientRect();
+              const containerScrollTop = this.lyricsContainer.scrollTop;
               
-              if (timeDiff >= 0 && timeDiff < 0.3) {
-                word.style.color = '#ffffff';
-                word.style.textShadow = '0 2px 12px rgba(255, 255, 255, 0.3)';
-                word.style.transform = 'scale(1.05)';
-                word.style.fontWeight = '600';
-              } else if (timeDiff >= 0.3) {
-                word.style.color = 'rgba(255, 255, 255, 0.5)';
-                word.style.textShadow = 'none';
-                word.style.transform = 'scale(1)';
-                word.style.fontWeight = '400';
-              } else {
-                word.style.color = 'rgba(255, 255, 255, 0.3)';
-                word.style.textShadow = 'none';
-                word.style.transform = 'scale(1)';
-                word.style.fontWeight = '400';
-              }
+              const lineRelativeTop = lineRect.top - containerRect.top + containerScrollTop;
+              const containerHeight = this.lyricsContainer.clientHeight;
+              const lineHeight = line.offsetHeight;
+              const scrollPosition = lineRelativeTop - (containerHeight / 2) + (lineHeight / 2);
+              
+              this.lyricsContainer.scrollTo({
+                top: scrollPosition,
+                behavior: 'smooth'
+              });
             }
-          });
-        }
-
-        // Smooth scroll to current lyric - center it in the viewport
-        setTimeout(() => {
-          const containerRect = this.lyricsContainer.getBoundingClientRect();
-          const lineRect = line.getBoundingClientRect();
-          const containerScrollTop = this.lyricsContainer.scrollTop;
+          } else {
+            line.classList.remove('current');
+            if (isPast) {
+              line.classList.add('past');
+              line.classList.remove('future');
+            } else {
+              line.classList.add('future');
+              line.classList.remove('past');
+            }
+            Object.assign(line.style, {
+              fontSize: '32px',
+              fontWeight: '400',
+              transform: 'translateZ(0)',
+              textShadow: 'none',
+              color: isPast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.5)',
+              transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease',
+              willChange: 'font-size, color'
+            });
+          }
+        });
+      });
+    }
+    
+    // Word-level updates (happens every frame for word mode)
+    if (currentTime !== null && this.highlightMode === 'word') {
+      const currentLine = lyricLines[currentIndex];
+      if (currentLine) {
+        const words = currentLine.querySelectorAll('.lyric-word');
+        words.forEach(word => {
+          const wordTime = parseFloat(word.dataset.wordTime);
           
-          // Calculate position to center the line
-          const lineRelativeTop = lineRect.top - containerRect.top + containerScrollTop;
-          const containerHeight = this.lyricsContainer.clientHeight;
-          const lineHeight = line.offsetHeight;
-          const scrollPosition = lineRelativeTop - (containerHeight / 2) + (lineHeight / 2);
-          
-          this.lyricsContainer.scrollTo({
-            top: scrollPosition,
-            behavior: 'smooth'
-          });
-        }, 50);
-      } else {
-        line.classList.remove('current');
-        if (isPast) {
-          line.classList.add('past');
-          line.classList.remove('future');
-        } else {
-          line.classList.add('future');
-          line.classList.remove('past');
-        }
-        Object.assign(line.style, {
-          fontSize: '32px',
-          fontWeight: '400',
-          transform: 'translateZ(0)',
-          textShadow: 'none',
-          color: isPast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.5)',
-          transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease',
-          willChange: 'font-size, color'
+          if (!isNaN(wordTime)) {
+            const timeDiff = currentTime - wordTime;
+            
+            if (timeDiff >= 0 && timeDiff < 0.3) {
+              word.style.color = '#ffffff';
+              word.style.textShadow = '0 2px 12px rgba(255, 255, 255, 0.3)';
+              word.style.transform = 'scale(1.05)';
+              word.style.fontWeight = '600';
+            } else if (timeDiff >= 0.3) {
+              word.style.color = 'rgba(255, 255, 255, 0.5)';
+              word.style.textShadow = 'none';
+              word.style.transform = 'scale(1)';
+              word.style.fontWeight = '400';
+            } else {
+              word.style.color = 'rgba(255, 255, 255, 0.3)';
+              word.style.textShadow = 'none';
+              word.style.transform = 'scale(1)';
+              word.style.fontWeight = '400';
+            }
+          }
         });
       }
-    });
+    }
   }
 }

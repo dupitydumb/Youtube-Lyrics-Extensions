@@ -164,11 +164,11 @@ class YouTubeLyricsApp {
   setupEventHandlers() {
     // Sync events
     this.sync.onUpdate((data) => {
-      this.ui.updateCurrentLyric(data.currentIndex, data.currentTime);
+      this.ui.updateCurrentLyric(data.currentIndex, data.currentTime, data.indexChanged);
       
       // If fullscreen is active, update there too
       if (this.fullscreen.isActive) {
-        this.fullscreen.updateCurrentLyric(data.currentIndex, data.currentTime);
+        this.fullscreen.updateCurrentLyric(data.currentIndex, data.currentTime, data.indexChanged);
       }
     });
     

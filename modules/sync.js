@@ -151,11 +151,13 @@ export class LyricsSync {
 
     if (result) {
       const { lyric, index } = result;
+      const indexChanged = index !== this.currentIndex;
       
-      // Always trigger callback with current time for word-level updates
+      // Trigger callback - pass indexChanged flag to optimize updates
       if (this.updateCallback) {
-        const previous = this.getPreviousLyric(index);
-        const next = this.getNextLyric(index);
+        // Only get previous/next on index change for performance
+        const previous = indexChanged ? this.getPreviousLyric(index) : null;
+        const next = indexChanged ? this.getNextLyric(index) : null;
         
         this.updateCallback({
           current: lyric,
@@ -165,7 +167,7 @@ export class LyricsSync {
           next,
           totalCount: this.syncedLyrics.length,
           progress: (index / this.syncedLyrics.length) * 100,
-          indexChanged: index !== this.currentIndex
+          indexChanged: indexChanged
         });
         
         this.currentIndex = index;
