@@ -264,7 +264,7 @@ export class FullscreenManager {
   /**
    * Update current lyric highlight in fullscreen
    */
-  updateCurrentLyric(currentIndex) {
+  updateCurrentLyric(currentIndex, currentTime) {
     if (!this.lyricsContainer) return;
 
     const lyricLines = this.lyricsContainer.querySelectorAll('.lyric-line');

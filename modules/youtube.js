@@ -238,6 +238,11 @@ export class YouTubeIntegration {
           console.log('⏳ Waiting for secondary inner element...');
           await this.waitForElement(this.selectors.SECONDARY_INNER, 5000);
           console.log('✅ Secondary inner element found');
+          
+          // Wait for title to actually change to the new video
+          console.log('⏳ Waiting for title to update...');
+          await this.waitForTitleChange(3000);
+          console.log('✅ Title updated');
         } catch (error) {
           console.warn('⚠️ Required elements not found, proceeding anyway:', error);
         }
@@ -296,6 +301,30 @@ export class YouTubeIntegration {
       setTimeout(() => {
         observer.disconnect();
         reject(new Error(`Element ${selector} not found within ${timeout}ms`));
+      }, timeout);
+    });
+  }
+
+  /**
+   * Wait for title to change from current stored title
+   */
+  waitForTitleChange(timeout = 3000) {
+    return new Promise((resolve) => {
+      const startTitle = this.currentTitle;
+      const checkInterval = setInterval(() => {
+        const newTitle = this.getVideoTitle();
+        if (newTitle && newTitle !== startTitle) {
+          clearInterval(checkInterval);
+          this.currentTitle = newTitle;
+          resolve(newTitle);
+        }
+      }, 100);
+
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        // Resolve anyway after timeout, update currentTitle
+        this.currentTitle = this.getVideoTitle();
+        resolve(this.currentTitle);
       }, timeout);
     });
   }

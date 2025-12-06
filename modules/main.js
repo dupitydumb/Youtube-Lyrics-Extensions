@@ -156,7 +156,7 @@ class YouTubeLyricsApp {
       
       // If fullscreen is active, update there too
       if (this.fullscreen.isActive) {
-        this.fullscreen.updateCurrentLyric(data.currentIndex);
+        this.fullscreen.updateCurrentLyric(data.currentIndex, data.currentTime);
       }
     });
     
@@ -228,6 +228,11 @@ class YouTubeLyricsApp {
             this.settings.set('highlightMode', value);
             this.highlightMode = value;
             this.ui.setHighlightMode(value);
+          },
+          onGradientThemeChange: (value) => {
+            this.settings.set('gradientTheme', value);
+            this.background.gradientTheme = value;
+            this.background.updateBackground(this.albumArtUrl);
           }
         }
       );
@@ -422,6 +427,11 @@ class YouTubeLyricsApp {
       this.sync.stop();
     }
     
+    // Reset state BEFORE exiting fullscreen to prevent old lyrics from being restored
+    this.currentVideoInfo = null;
+    this.currentLyrics = null;
+    this.albumArtUrl = null;
+    
     // Exit fullscreen
     if (this.fullscreen && this.fullscreen.isActive) {
       this.fullscreen.exit();
@@ -432,11 +442,6 @@ class YouTubeLyricsApp {
       this.ui.removePanel();
       this.ui.removeVideoPlayerControls();
     }
-    
-    // Reset state
-    this.currentVideoInfo = null;
-    this.currentLyrics = null;
-    this.albumArtUrl = null;
   }
 }
 

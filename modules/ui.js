@@ -995,6 +995,27 @@ export class LyricsUI {
         onChange: (value) => {
           if (settings?.onHighlightModeChange) settings.onHighlightModeChange(value);
         }
+      },
+      {
+        type: 'submenu',
+        label: 'Gradient theme',
+        currentValue: this.getGradientThemeLabel(settings?.gradientTheme || 'sunset'),
+        options: [
+          { value: 'sunset', label: 'Sunset' },
+          { value: 'ocean', label: 'Ocean' },
+          { value: 'forest', label: 'Forest' },
+          { value: 'fire', label: 'Fire' },
+          { value: 'purple', label: 'Purple Dream' },
+          { value: 'cool', label: 'Cool Blues' },
+          { value: 'warm', label: 'Warm Sunset' },
+          { value: 'northern', label: 'Northern Lights' },
+          { value: 'peach', label: 'Peach' },
+          { value: 'neon', label: 'Neon' }
+        ],
+        selected: settings?.gradientTheme || 'sunset',
+        onChange: (value) => {
+          if (settings?.onGradientThemeChange) settings.onGradientThemeChange(value);
+        }
       }
     ];
     
@@ -1164,6 +1185,8 @@ export class LyricsUI {
               valueDiv.textContent = this.getBackgroundLabel(value);
             } else if (item.label === 'Highlight mode') {
               valueDiv.textContent = this.getHighlightLabel(value);
+            } else if (item.label === 'Gradient theme') {
+              valueDiv.textContent = this.getGradientThemeLabel(value);
             } else {
               valueDiv.textContent = value;
             }
@@ -1176,6 +1199,8 @@ export class LyricsUI {
                   this.settingsRef.backgroundMode = value;
                 } else if (item.label === 'Highlight mode') {
                   this.settingsRef.highlightMode = value;
+                } else if (item.label === 'Gradient theme') {
+                  this.settingsRef.gradientTheme = value;
                 }
               }
             }
@@ -1317,6 +1342,25 @@ export class LyricsUI {
       'word': 'Word by word'
     };
     return labels[mode] || 'Full line';
+  }
+
+  /**
+   * Get gradient theme label
+   */
+  getGradientThemeLabel(theme) {
+    const labels = {
+      'sunset': 'Sunset',
+      'ocean': 'Ocean',
+      'forest': 'Forest',
+      'fire': 'Fire',
+      'purple': 'Purple Dream',
+      'cool': 'Cool Blues',
+      'warm': 'Warm Sunset',
+      'northern': 'Northern Lights',
+      'peach': 'Peach',
+      'neon': 'Neon'
+    };
+    return labels[theme] || 'Sunset';
   }
 
   /**
