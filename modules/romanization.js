@@ -15,6 +15,12 @@ export const Romanizer = {
     return 'unknown';
   },
 
+  needsRomanization(text) {
+    if (!text) return false;
+    const lang = this.detectLanguage(text);
+    return lang === 'ja' || lang === 'ko';
+  },
+
   romanize(text) {
     const lang = this.detectLanguage(text);
     if (lang === 'ko') return this.romanizeKorean(text);

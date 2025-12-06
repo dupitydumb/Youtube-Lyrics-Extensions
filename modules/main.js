@@ -223,6 +223,7 @@ class YouTubeLyricsApp {
           backgroundMode: this.settings.get('backgroundMode'),
           highlightMode: this.settings.get('highlightMode'),
           showRomanization: this.settings.get('showRomanization') === true,
+          hideOriginalLyrics: this.settings.get('hideOriginalLyrics') === true,
           onFontSizeChange: (value) => {
             this.settings.set('fontSize', value);
             this.ui.setFontSize(value);
@@ -255,6 +256,13 @@ class YouTubeLyricsApp {
                 this.currentLyrics.map(l => ({ time: l.time, text: l.text, words: l.words }))
               );
               this.currentLyrics = rebuilt;
+              this.renderCurrentLyrics();
+            }
+          },
+          onHideOriginalLyricsChange: (enabled) => {
+            this.settings.set('hideOriginalLyrics', enabled);
+            // Re-render current lyrics with the new setting
+            if (this.currentLyrics) {
               this.renderCurrentLyrics();
             }
           }
