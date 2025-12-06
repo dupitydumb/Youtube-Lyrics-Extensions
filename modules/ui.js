@@ -74,6 +74,8 @@ export class LyricsUI {
   applyPanelStyles(element) {
     const styles = UI_CONFIG.APPLE_MUSIC_STYLE;
     Object.assign(element.style, {
+      position: 'relative',
+      zIndex: '2',
       background: styles.BACKGROUND_COLOR,
       backdropFilter: `blur(${styles.BACKDROP_BLUR})`,
       WebkitBackdropFilter: `blur(${styles.BACKDROP_BLUR})`,
@@ -167,7 +169,8 @@ export class LyricsUI {
       justifyContent: 'center',
       alignItems: 'center',
       paddingBottom: '16px',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+      zIndex: '100'
     });
 
     const titleContainer = document.createElement('div');
@@ -179,31 +182,31 @@ export class LyricsUI {
     const title = document.createElement('h3');
     title.id = 'song-title';
     title.textContent = 'Lyrics';
-    Object.assign(title.style, {
-      margin: '0',
-      fontSize: '18px',
-      fontWeight: '600',
-      color: '#ffffff',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
-      opacity: '1',
-      visibility: 'visible'
-    });
+    title.style.cssText = `
+      margin: 0 !important;
+      font-size: 18px !important;
+      font-weight: 600 !important;
+      color: #ffffff !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+    `;
 
     const artist = document.createElement('p');
     artist.id = 'song-artist';
     artist.textContent = '';
-    Object.assign(artist.style, {
-      margin: '4px 0 0 0',
-      fontSize: '14px',
-      color: 'rgba(255, 255, 255, 0.6)',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
-      opacity: '1',
-      visibility: 'visible'
-    });
+    artist.style.cssText = `
+      margin: 4px 0 0 0 !important;
+      font-size: 14px !important;
+      color: rgba(255, 255, 255, 0.6) !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+    `;
 
     titleContainer.appendChild(title);
     titleContainer.appendChild(artist);

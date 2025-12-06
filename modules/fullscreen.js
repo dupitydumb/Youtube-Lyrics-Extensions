@@ -10,6 +10,14 @@ export class FullscreenManager {
     this.isActive = false;
     this.keyboardHandler = null;
     this.onExitCallback = null;
+    this.highlightMode = 'line'; // 'line' or 'word'
+  }
+
+  /**
+   * Set highlight mode
+   */
+  setHighlightMode(mode) {
+    this.highlightMode = mode;
   }
 
   /**
@@ -73,7 +81,10 @@ export class FullscreenManager {
     if (lyrics && Array.isArray(lyrics)) {
       this.displayLyricsInFullscreen(lyrics);
       if (currentIndex >= 0) {
-        this.updateCurrentLyric(currentIndex);
+        // Scroll immediately to current lyric without delay
+        setTimeout(() => {
+          this.updateCurrentLyric(currentIndex);
+        }, 100);
       }
     }
     
@@ -235,7 +246,27 @@ export class FullscreenManager {
       lyricLine.className = 'lyric-line future';
       lyricLine.dataset.index = index;
       lyricLine.dataset.time = lyric.time;
-      lyricLine.textContent = lyric.text;
+      
+      // Check if lyric has word-level timing
+      if (lyric.words && lyric.words.length > 0) {
+        // Create word-by-word display
+        lyric.words.forEach((wordData, wordIndex) => {
+          const wordSpan = document.createElement('span');
+          wordSpan.className = 'lyric-word future';
+          wordSpan.textContent = wordData.word;
+          wordSpan.dataset.wordIndex = wordIndex;
+          wordSpan.dataset.wordTime = wordData.time;
+          lyricLine.appendChild(wordSpan);
+          
+          // Add space after word (except last word)
+          if (wordIndex < lyric.words.length - 1) {
+            lyricLine.appendChild(document.createTextNode(' '));
+          }
+        });
+      } else {
+        // Regular line-by-line display
+        lyricLine.textContent = lyric.text;
+      }
 
       Object.assign(lyricLine.style, {
         padding: '20px 30px',
@@ -284,18 +315,45 @@ export class FullscreenManager {
           textShadow: '0 0 30px rgba(255, 255, 255, 0.5)'
         });
 
-        // Smooth scroll to current lyric
-        setTimeout(() => {
-          const containerHeight = this.lyricsContainer.clientHeight;
-          const lineTop = line.offsetTop;
-          const lineHeight = line.offsetHeight;
-          const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
-          
-          this.lyricsContainer.scrollTo({
-            top: scrollPosition,
-            behavior: 'smooth'
+        // Update word-by-word highlighting if available and in word mode
+        if (currentTime !== null && this.highlightMode === 'word') {
+          const words = line.querySelectorAll('.lyric-word');
+          words.forEach(word => {
+            const wordTime = parseFloat(word.dataset.wordTime);
+            
+            if (!isNaN(wordTime)) {
+              const timeDiff = currentTime - wordTime;
+              
+              if (timeDiff >= 0 && timeDiff < 0.3) {
+                word.style.color = '#ffffff';
+                word.style.textShadow = '0 0 20px rgba(255, 255, 255, 0.5)';
+                word.style.transform = 'scale(1.05)';
+                word.style.fontWeight = '700';
+              } else if (timeDiff >= 0.3) {
+                word.style.color = 'rgba(255, 255, 255, 0.5)';
+                word.style.textShadow = 'none';
+                word.style.transform = 'scale(1)';
+                word.style.fontWeight = '400';
+              } else {
+                word.style.color = 'rgba(255, 255, 255, 0.3)';
+                word.style.textShadow = 'none';
+                word.style.transform = 'scale(1)';
+                word.style.fontWeight = '400';
+              }
+            }
           });
-        }, 50);
+        }
+
+        // Smooth scroll to current lyric
+        const containerHeight = this.lyricsContainer.clientHeight;
+        const lineTop = line.offsetTop;
+        const lineHeight = line.offsetHeight;
+        const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
+        
+        this.lyricsContainer.scrollTo({
+          top: scrollPosition,
+          behavior: 'smooth'
+        });
       } else {
         line.classList.remove('current');
         if (isPast) {

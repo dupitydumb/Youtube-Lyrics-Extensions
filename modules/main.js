@@ -260,6 +260,7 @@ class YouTubeLyricsApp {
     if (this.fullscreen.isActive) {
       this.fullscreen.exit();
     } else {
+      this.fullscreen.setHighlightMode(this.highlightMode);
       this.fullscreen.enter(this.currentLyrics, this.sync.currentIndex, this.albumArtUrl);
     }
   }
