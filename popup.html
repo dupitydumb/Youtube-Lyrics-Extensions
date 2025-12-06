@@ -402,118 +402,12 @@
         </label>
       </div>
 
-      <!-- Font Size Section -->
-      <div class="section">
-        <div class="section-header">
-          <span class="section-title">Font Size</span>
-        </div>
-        <p class="section-desc">Adjust the size of lyrics text</p>
-        <div class="font-size-control">
-          <span class="font-size-label">Size:</span>
-          <input 
-            type="range" 
-            id="font-size-slider" 
-            class="font-size-slider"
-            min="12" 
-            max="24" 
-            step="1" 
-            value="16"
-            aria-label="Font size"
-          />
-          <span class="font-size-value" id="font-size-value">16px</span>
-        </div>
-      </div>
 
-      <!-- Background Mode Section -->
-      <div class="section">
-        <div class="section-header">
-          <span class="section-title">Background Style</span>
-        </div>
-        <p class="section-desc">Choose the panel background appearance</p>
-        <div class="background-mode-grid" id="background-mode-grid">
-          <button class="bg-mode-btn" data-mode="none">
-            <span class="mode-icon">⬛</span>
-            <span class="mode-label">None</span>
-          </button>
-          <button class="bg-mode-btn" data-mode="gradient">
-            <span class="mode-icon">🎨</span>
-            <span class="mode-label">Gradient</span>
-          </button>
-          <button class="bg-mode-btn active" data-mode="album">
-            <span class="mode-icon">🖼️</span>
-            <span class="mode-label">Album</span>
-          </button>
-          <button class="bg-mode-btn" data-mode="video">
-            <span class="mode-icon">🎬</span>
-            <span class="mode-label">Video</span>
-          </button>
-        </div>
-        
-        <!-- Gradient Theme (conditional) -->
-        <div class="gradient-theme-section" id="gradient-theme-section" style="display: none;">
-          <div class="font-size-control" style="margin-top: 12px;">
-            <span class="font-size-label">Theme:</span>
-            <select id="gradient-theme-select" class="theme-select">
-              <option value="random">🎲 Random</option>
-              <option value="Sunset">Sunset</option>
-              <option value="Ocean">Ocean</option>
-              <option value="Forest">Forest</option>
-              <option value="Fire">Fire</option>
-              <option value="Purple Dream">Purple Dream</option>
-              <option value="Cool Blues">Cool Blues</option>
-              <option value="Warm Sunset">Warm Sunset</option>
-              <option value="Northern Lights">Northern Lights</option>
-              <option value="Peach">Peach</option>
-              <option value="Neon">Neon</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- Playback Mode Section -->
-      <div class="section">
-        <div class="section-header">
-          <span class="section-title">Playback Mode</span>
-        </div>
-        <p class="section-desc">Choose how lyrics are displayed</p>
-        <div class="playback-mode-grid">
-          <button class="playback-mode-btn active" data-mode="synced">
-            <span class="mode-icon">🎵</span>
-            <span class="mode-label">Synced</span>
-          </button>
-          <button class="playback-mode-btn" data-mode="plain">
-            <span class="mode-icon">📄</span>
-            <span class="mode-label">Plain Text</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Sync Offset Section -->
-      <div class="section">
-        <div class="section-header">
-          <span class="section-title">Sync Offset</span>
-        </div>
-        <p class="section-desc">Adjust timing if lyrics are out of sync</p>
-        <div class="font-size-control">
-          <span class="font-size-label">Offset:</span>
-          <input 
-            type="range" 
-            id="sync-offset-slider" 
-            class="font-size-slider"
-            min="-1000" 
-            max="1000" 
-            step="50" 
-            value="0"
-            aria-label="Sync offset"
-          />
-          <span class="font-size-value" id="sync-offset-value">0ms</span>
-        </div>
-      </div>
 
       <!-- Info Section -->
       <div class="info">
         <div class="info-title">How to use</div>
-        Open any YouTube music video and lyrics will appear automatically. Click on any lyric line to jump to that timestamp. Use the settings button in the video player to customize.
+        Open any YouTube music video and lyrics will appear automatically. Click on any lyric line to jump to that timestamp. Use the settings button (🎵) in the video player to customize font size, sync offset, background style, and more.
       </div>
     </div>
 

@@ -1,6 +1,8 @@
 /**
- * YouTube Lyrics Extension v2.0 - Refactored with Apple Music Style UI
- * All-in-one file compatible with Chrome extensions (no ES6 imports)
+
+  Deprecated: This file is no longer in use as of version 3.0.0
+  Only kept for reference purposes.
+
  */
 
 (function() {

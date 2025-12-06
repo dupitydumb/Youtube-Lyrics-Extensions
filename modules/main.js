@@ -38,6 +38,10 @@ class YouTubeLyricsApp {
     await this.settings.load();
     await this.background.loadSettings();
     
+    // Load highlight mode
+    this.highlightMode = this.settings.get('highlightMode') || 'line';
+    this.ui.setHighlightMode(this.highlightMode);
+    
     // Check if extension is enabled
     if (!this.settings.get('enabled')) {
       console.log('YouTube Lyrics Extension is disabled');
@@ -97,6 +101,11 @@ class YouTubeLyricsApp {
         this.sync.setDelay(changes.syncDelay);
       }
       
+      if (changes.highlightMode !== undefined) {
+        this.highlightMode = changes.highlightMode;
+        this.ui.setHighlightMode(changes.highlightMode);
+      }
+      
       if (changes.backgroundMode !== undefined || 
           changes.gradientTheme !== undefined || 
           changes.customColors !== undefined) {
@@ -124,6 +133,12 @@ class YouTubeLyricsApp {
         } else if (message.type === 'updateGradientTheme') {
           this.background.gradientTheme = message.gradientTheme;
           this.background.updateBackground(this.albumArtUrl);
+        } else if (message.type === 'updateCustomColors') {
+          this.background.customColors = message.customColors;
+          this.background.updateBackground(this.albumArtUrl);
+        } else if (message.type === 'updateHighlightMode') {
+          this.highlightMode = message.highlightMode;
+          this.ui.setHighlightMode(message.highlightMode);
         } else if (message.type === 'updatePlaybackMode') {
           // Handle playback mode changes if needed
         }
@@ -141,10 +156,7 @@ class YouTubeLyricsApp {
       
       // If fullscreen is active, update there too
       if (this.fullscreen.isActive) {
-        const container = this.fullscreen.getLyricsContainer();
-        if (container) {
-          this.ui.updateLyricInContainer(container, data.currentIndex, data.current);
-        }
+        this.fullscreen.updateCurrentLyric(data.currentIndex);
       }
     });
     
@@ -198,6 +210,7 @@ class YouTubeLyricsApp {
           fontSize: this.settings.get('fontSize'),
           syncDelay: this.settings.get('syncDelay'),
           backgroundMode: this.settings.get('backgroundMode'),
+          highlightMode: this.settings.get('highlightMode'),
           onFontSizeChange: (value) => {
             this.settings.set('fontSize', value);
             this.ui.setFontSize(value);
@@ -210,6 +223,11 @@ class YouTubeLyricsApp {
             this.settings.set('backgroundMode', value);
             this.background.mode = value;
             this.background.updateBackground(this.albumArtUrl);
+          },
+          onHighlightModeChange: (value) => {
+            this.settings.set('highlightMode', value);
+            this.highlightMode = value;
+            this.ui.setHighlightMode(value);
           }
         }
       );
@@ -244,8 +262,7 @@ class YouTubeLyricsApp {
     if (this.fullscreen.isActive) {
       this.fullscreen.exit();
     } else {
-      this.fullscreen.enter(this.currentLyrics, this.albumArtUrl);
-      this.sync.syncWithVideo();
+      this.fullscreen.enter(this.currentLyrics, this.sync.currentIndex, this.albumArtUrl);
     }
   }
 

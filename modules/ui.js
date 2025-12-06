@@ -13,6 +13,7 @@ export class LyricsUI {
     this.currentStyle = 'apple-music';
     this.settingsRef = null; // Store settings reference for updates
     this.currentFontSize = 16; // Store current font size
+    this.highlightMode = 'line'; // 'line' or 'word'
   }
 
   /**
@@ -401,6 +402,15 @@ export class LyricsUI {
     const words = lineElement.querySelectorAll('.lyric-word');
     if (words.length === 0) return;
 
+    // Only highlight words if in word mode
+    if (this.highlightMode !== 'word') {
+      // In line mode, remove word-specific highlighting
+      words.forEach(word => {
+        word.classList.remove('highlighted', 'past', 'future');
+      });
+      return;
+    }
+
     words.forEach(word => {
       const wordTime = parseFloat(word.dataset.wordTime);
       
@@ -628,6 +638,14 @@ export class LyricsUI {
         }
       });
     }
+  }
+
+  /**
+   * Set highlight mode (line or word)
+   */
+  setHighlightMode(mode) {
+    this.highlightMode = mode;
+    console.log('Highlight mode set to:', mode);
   }
 
   /**
@@ -957,12 +975,25 @@ export class LyricsUI {
         options: [
           { value: 'album', label: 'Album art' },
           { value: 'gradient', label: 'Gradient' },
-          { value: 'vinyl', label: 'Vinyl disc' },
+          { value: 'video', label: 'Video thumbnail' },
           { value: 'none', label: 'None' }
         ],
         selected: settings?.backgroundMode || 'album',
         onChange: (value) => {
           if (settings?.onBackgroundModeChange) settings.onBackgroundModeChange(value);
+        }
+      },
+      {
+        type: 'submenu',
+        label: 'Highlight mode',
+        currentValue: this.getHighlightLabel(settings?.highlightMode || 'line'),
+        options: [
+          { value: 'line', label: 'Full line' },
+          { value: 'word', label: 'Word by word' }
+        ],
+        selected: settings?.highlightMode || 'line',
+        onChange: (value) => {
+          if (settings?.onHighlightModeChange) settings.onHighlightModeChange(value);
         }
       }
     ];
@@ -1128,12 +1159,25 @@ export class LyricsUI {
           e.stopPropagation();
           // Create submenu
           const submenu = this.createSubmenu(item.label, item.options, item.selected, (value) => {
-            valueDiv.textContent = this.getBackgroundLabel(value);
+            // Update display based on submenu type
+            if (item.label === 'Background') {
+              valueDiv.textContent = this.getBackgroundLabel(value);
+            } else if (item.label === 'Highlight mode') {
+              valueDiv.textContent = this.getHighlightLabel(value);
+            } else {
+              valueDiv.textContent = value;
+            }
             valueDiv.appendChild(arrow);
             if (item.onChange) {
               item.onChange(value);
               // Update stored settings
-              if (this.settingsRef) this.settingsRef.backgroundMode = value;
+              if (this.settingsRef) {
+                if (item.label === 'Background') {
+                  this.settingsRef.backgroundMode = value;
+                } else if (item.label === 'Highlight mode') {
+                  this.settingsRef.highlightMode = value;
+                }
+              }
             }
             submenu.remove();
           });
@@ -1202,6 +1246,7 @@ export class LyricsUI {
     // Options
     options.forEach(option => {
       const optionItem = document.createElement('div');
+      optionItem.setAttribute('data-option', 'true');
       optionItem.style.cssText = `
         padding: 8px 16px;
         display: flex;
@@ -1233,6 +1278,14 @@ export class LyricsUI {
       
       optionItem.addEventListener('click', (e) => {
         e.stopPropagation();
+        // Update all checkmarks
+        const allCheckmarks = submenu.querySelectorAll('div[data-option]');
+        allCheckmarks.forEach((item, idx) => {
+          const check = item.querySelector('div:last-child');
+          if (check) {
+            check.style.opacity = options[idx].value === option.value ? '1' : '0';
+          }
+        });
         if (onChange) onChange(option.value);
       });
       
@@ -1249,10 +1302,21 @@ export class LyricsUI {
     const labels = {
       'album': 'Album art',
       'gradient': 'Gradient',
-      'vinyl': 'Vinyl disc',
+      'video': 'Video thumbnail',
       'none': 'None'
     };
     return labels[mode] || 'Album art';
+  }
+
+  /**
+   * Get highlight mode label
+   */
+  getHighlightLabel(mode) {
+    const labels = {
+      'line': 'Full line',
+      'word': 'Word by word'
+    };
+    return labels[mode] || 'Full line';
   }
 
   /**
