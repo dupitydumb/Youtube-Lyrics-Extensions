@@ -24,7 +24,6 @@ export class SettingsManager {
   async load(keys = null) {
     try {
       if (typeof chrome === 'undefined' || !chrome.storage) {
-        console.warn('Chrome storage API not available, using defaults');
         this.settings = { ...this.defaults };
         return this.settings;
       }
@@ -36,7 +35,6 @@ export class SettingsManager {
       
       return this.settings;
     } catch (error) {
-      console.error('Failed to load settings:', error);
       return this.defaults;
     }
   }
@@ -59,7 +57,6 @@ export class SettingsManager {
       
       return true;
     } catch (error) {
-      console.error('Failed to save settings:', error);
       return false;
     }
   }
@@ -99,7 +96,7 @@ export class SettingsManager {
       try {
         callback(changes, this.settings);
       } catch (error) {
-        console.error('Error in settings listener:', error);
+        // Error in settings listener
       }
     }
   }
@@ -109,7 +106,6 @@ export class SettingsManager {
    */
   listenToStorageChanges() {
     if (typeof chrome === 'undefined' || !chrome.storage) {
-      console.warn('Chrome storage API not available, storage change listener not set');
       return;
     }
     chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -143,7 +139,6 @@ export class SettingsManager {
       this.notifyListeners(this.defaults);
       return true;
     } catch (error) {
-      console.error('Failed to reset settings:', error);
       return false;
     }
   }
@@ -182,7 +177,6 @@ export class SettingsManager {
       
       return true;
     } catch (error) {
-      console.error('Failed to migrate settings:', error);
       return false;
     }
   }

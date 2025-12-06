@@ -32,8 +32,6 @@ class YouTubeLyricsApp {
    * Initialize the application
    */
   async initialize() {
-    console.log('YouTube Lyrics Extension - Initializing...');
-    
     // Load settings
     await this.settings.load();
     await this.background.loadSettings();
@@ -44,7 +42,6 @@ class YouTubeLyricsApp {
     
     // Check if extension is enabled
     if (!this.settings.get('enabled')) {
-      console.log('YouTube Lyrics Extension is disabled');
       return;
     }
     
@@ -67,7 +64,6 @@ class YouTubeLyricsApp {
     
     // Check if already on a video page when extension loads
     if (this.youtube.isVideoPage()) {
-      console.log('Already on video page, waiting for elements...');
       const observer = new MutationObserver((mutations, obs) => {
         const secondaryInner = document.querySelector('#secondary-inner');
         if (secondaryInner && this.youtube.getVideoTitle()) {
@@ -84,8 +80,6 @@ class YouTubeLyricsApp {
       });
       observer.observe(document.body, { childList: true, subtree: true });
     }
-    
-    console.log('YouTube Lyrics Extension - Ready');
   }
 
   /**
@@ -176,7 +170,6 @@ class YouTubeLyricsApp {
    * Handle video change
    */
   async handleVideoChange(videoInfo) {
-    console.log('Video changed:', videoInfo.title);
     this.currentVideoInfo = videoInfo;
     
     // Reset state
@@ -244,7 +237,7 @@ class YouTubeLyricsApp {
       await this.loadLyrics(videoInfo);
       
     } catch (error) {
-      console.error('Failed to initialize panel:', error);
+      // Failed to initialize panel
     }
   }
 
@@ -276,54 +269,38 @@ class YouTubeLyricsApp {
    */
   async loadLyrics(videoInfo) {
     try {
-      // Build search query from title and artist
-      const searchParts = [];
+      // Try with video title only first
+      let results = null;
+      
       if (videoInfo.title) {
-        searchParts.push(videoInfo.title);
-      }
-      if (videoInfo.artist) {
-        searchParts.push(videoInfo.artist);
-      }
-      
-      const rawQuery = searchParts.join(' ');
-      const query = this.youtube.formatTitle(rawQuery, FILTER_WORDS);
-      
-      console.log('🎵 Video Info:', videoInfo);
-      console.log('🎵 Title:', videoInfo.title);
-      console.log('🎵 Artist:', videoInfo.artist);
-      console.log('🔍 Raw query:', rawQuery);
-      console.log('🔍 Formatted query:', query);
-      console.log('🔍 Query length:', query.length);
-      
-      // If query is too short, use raw query without filtering
-      if (query.length < 3) {
-        console.warn('⚠️ Query too short, using raw query');
-        console.log('🔍 Fallback query:', rawQuery);
+        const titleOnlyQuery = this.youtube.formatTitle(videoInfo.title, FILTER_WORDS);
         
-        const results = await this.api.searchLyrics(rawQuery);
-        console.log('📊 API Results (fallback):', results);
-        console.log('📊 Results count (fallback):', results ? results.length : 0);
-        
-        if (!results || results.length === 0) {
-          console.warn('❌ No results from API even with fallback');
-          this.ui.showError('No lyrics found for this song');
-          return;
+        if (titleOnlyQuery.length >= 3) {
+          results = await this.api.searchLyrics(titleOnlyQuery);
+        }
+      }
+      
+      // If no results with title only, try with title + artist
+      if ((!results || results.length === 0) && videoInfo.artist) {
+        const searchParts = [];
+        if (videoInfo.title) {
+          searchParts.push(videoInfo.title);
+        }
+        if (videoInfo.artist) {
+          searchParts.push(videoInfo.artist);
         }
         
-        this.processLyricsResults(results, videoInfo);
-        return;
+        const rawQuery = searchParts.join(' ');
+        const query = this.youtube.formatTitle(rawQuery, FILTER_WORDS);
+        
+        if (query.length >= 3) {
+          results = await this.api.searchLyrics(query);
+        } else {
+          results = await this.api.searchLyrics(rawQuery);
+        }
       }
       
-      console.log('🔍 Search query:', query);
-      
-      // Search lyrics
-      const results = await this.api.searchLyrics(query);
-      
-      console.log('📊 API Results:', results);
-      console.log('📊 Results count:', results ? results.length : 0);
-      
       if (!results || results.length === 0) {
-        console.warn('❌ No results from API');
         this.ui.showError('No lyrics found for this song');
         return;
       }
@@ -331,7 +308,6 @@ class YouTubeLyricsApp {
       this.processLyricsResults(results, videoInfo);
       
     } catch (error) {
-      console.error('Error loading lyrics:', error);
       this.ui.showError('Failed to load lyrics');
     }
   }
@@ -340,42 +316,30 @@ class YouTubeLyricsApp {
    * Process lyrics results
    */
   async processLyricsResults(results, videoInfo) {
-    // Log each result
-    results.forEach((result, index) => {
-      console.log(`📝 Result ${index + 1}:`, {
-        trackName: result.trackName,
-        artistName: result.artistName,
-        albumName: result.albumName,
-        hasSyncedLyrics: !!result.syncedLyrics,
-        hasPlainLyrics: !!result.plainLyrics
-      });
-    });
-    
     // Find best match
     const bestMatch = this.api.findBestMatch(results, videoInfo.artist);
     
-    console.log('✅ Best match:', bestMatch ? {
-      trackName: bestMatch.trackName,
-      artistName: bestMatch.artistName,
-      hasSyncedLyrics: !!bestMatch.syncedLyrics,
-      hasPlainLyrics: !!bestMatch.plainLyrics
-    } : 'None');
-    
     if (!bestMatch) {
-      console.warn('❌ No best match found');
       this.ui.showError('No lyrics found for this song');
       return;
     }
     
     // Parse synced lyrics
     if (bestMatch.syncedLyrics) {
-      console.log('🎼 Parsing synced lyrics...');
       const syncedLyrics = this.api.parseSyncedLyrics(bestMatch.syncedLyrics);
-      console.log('🎼 Parsed lyrics count:', syncedLyrics.length);
       this.currentLyrics = syncedLyrics;
+        
+        // Update title and artist in header
+        this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist);
         
         // Display lyrics
         this.ui.displaySyncedLyrics(syncedLyrics);
+        
+        // Apply stored font size
+        const storedFontSize = this.settings.get('fontSize');
+        if (storedFontSize) {
+          this.ui.setFontSize(storedFontSize);
+        }
         
         // Create controls
         this.createControls(bestMatch, results);
@@ -394,8 +358,18 @@ class YouTubeLyricsApp {
         }
         
       } else if (bestMatch.plainLyrics) {
+        // Update title and artist in header
+        this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist);
+        
         // Display plain lyrics
         this.ui.displayPlainLyrics(bestMatch.plainLyrics);
+        
+        // Apply stored font size
+        const storedFontSize = this.settings.get('fontSize');
+        if (storedFontSize) {
+          this.ui.setFontSize(storedFontSize);
+        }
+        
         this.createControls(bestMatch, results);
       } else {
         this.ui.showError('No lyrics available for this song');
@@ -414,7 +388,6 @@ class YouTubeLyricsApp {
    * Handle navigate away from video
    */
   handleNavigateAway() {
-    console.log('Navigated away from video page');
     this.cleanup();
   }
 
