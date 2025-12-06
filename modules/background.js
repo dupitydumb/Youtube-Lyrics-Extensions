@@ -209,7 +209,7 @@ export class BackgroundManager {
       transform: translateY(-50%);
       width: ${fullscreen ? '1000px' : '600px'};
       height: ${fullscreen ? '1000px' : '600px'};
-      z-index: 1;
+      z-index: 0;
       ${fullscreen ? 'opacity: 0.4;' : ''}
     `;
     
