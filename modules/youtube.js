@@ -39,12 +39,6 @@ export class YouTubeIntegration {
    */
   getVideoTitle() {
     const titleEl = document.querySelector(this.selectors.VIDEO_TITLE);
-    console.log('🎬 Title element found:', titleEl);
-    console.log('🎬 Title element selector:', this.selectors.VIDEO_TITLE);
-    if (titleEl) {
-      console.log('🎬 Title text content:', titleEl.textContent);
-      console.log('🎬 Title innerHTML:', titleEl.innerHTML);
-    }
     return titleEl ? titleEl.textContent.trim() : '';
   }
 
@@ -84,7 +78,6 @@ export class YouTubeIntegration {
       
       return null;
     } catch (error) {
-      console.error('Error extracting album art:', error);
       return null;
     }
   }
@@ -172,7 +165,6 @@ export class YouTubeIntegration {
         if (currentUrl !== this.currentUrl || currentVideoId !== this.currentVideoId) {
           this.currentUrl = currentUrl;
           this.currentVideoId = currentVideoId;
-          console.log('Video changed - URL:', currentUrl, 'VideoID:', currentVideoId);
           this.triggerNavigate();
         }
       } else if (this.currentUrl.includes('/watch')) {
@@ -223,28 +215,17 @@ export class YouTubeIntegration {
    * Trigger navigation callback
    */
   async triggerNavigate(navigateAway = false) {
-    console.log('🚀 triggerNavigate called, navigateAway:', navigateAway);
     if (this.onNavigateCallback) {
       if (navigateAway) {
-        console.log('🚀 Navigating away');
         this.onNavigateCallback(null);
       } else {
         // Wait for both title and secondary elements to be ready
         try {
-          console.log('⏳ Waiting for title element...');
           await this.waitForElement(this.selectors.VIDEO_TITLE, 5000);
-          console.log('✅ Title element found');
-
-          console.log('⏳ Waiting for secondary inner element...');
           await this.waitForElement(this.selectors.SECONDARY_INNER, 5000);
-          console.log('✅ Secondary inner element found');
-          
           // Wait for title to actually change to the new video
-          console.log('⏳ Waiting for title to update...');
           await this.waitForTitleChange(3000);
-          console.log('✅ Title updated');
         } catch (error) {
-          console.warn('⚠️ Required elements not found, proceeding anyway:', error);
         }
         
         const videoInfo = {
@@ -253,7 +234,6 @@ export class YouTubeIntegration {
           videoId: this.getVideoId(),
           url: window.location.href
         };
-        console.log('📹 Video info extracted:', videoInfo);
         this.onNavigateCallback(videoInfo);
       }
     }

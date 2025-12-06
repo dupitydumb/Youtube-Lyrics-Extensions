@@ -131,7 +131,6 @@ export class LyricsSync {
    */
   start() {
     if (!this.videoElement || !this.syncedLyrics.length) {
-      console.error('Cannot start sync: missing video element or lyrics');
       return;
     }
 

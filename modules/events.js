@@ -22,7 +22,7 @@ export class EventBus {
         // Use queueMicrotask for async event handling
         queueMicrotask(() => handler(data));
       } catch (error) {
-        console.error(`Error in event handler for ${eventName}:`, error);
+        // Error in event handler
       }
     }
   }

@@ -107,18 +107,18 @@ export class LyricsUI {
     const style = document.createElement('style');
     style.textContent = `
       #lyrics-display::-webkit-scrollbar {
-        width: 6px;
+        display: none;
       }
-      #lyrics-display::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
+      
+      #lyrics-display {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
       }
-      #lyrics-display::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.3);
-        border-radius: 3px;
-      }
-      #lyrics-display::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.5);
+      
+      /* Ensure title and artist remain visible */
+      #song-title, #song-artist {
+        opacity: 1 !important;
+        visibility: visible !important;
       }
       
       /* Word-by-word highlighting */
@@ -164,7 +164,7 @@ export class LyricsUI {
     const header = document.createElement('div');
     Object.assign(header.style, {
       display: 'flex',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
       alignItems: 'center',
       paddingBottom: '16px',
       borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
@@ -173,7 +173,7 @@ export class LyricsUI {
     const titleContainer = document.createElement('div');
     titleContainer.id = 'lyrics-title';
     Object.assign(titleContainer.style, {
-      flex: '1'
+      textAlign: 'center'
     });
 
     const title = document.createElement('h3');
@@ -186,7 +186,9 @@ export class LyricsUI {
       color: '#ffffff',
       overflow: 'hidden',
       textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap'
+      whiteSpace: 'nowrap',
+      opacity: '1',
+      visibility: 'visible'
     });
 
     const artist = document.createElement('p');
@@ -198,7 +200,9 @@ export class LyricsUI {
       color: 'rgba(255, 255, 255, 0.6)',
       overflow: 'hidden',
       textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap'
+      whiteSpace: 'nowrap',
+      opacity: '1',
+      visibility: 'visible'
     });
 
     titleContainer.appendChild(title);
@@ -343,10 +347,11 @@ export class LyricsUI {
         line.classList.add('current');
         Object.assign(line.style, {
           color: '#ffffff',
-          fontSize: `${this.currentFontSize * 1.5}px`,
           fontWeight: '600',
-          transform: `scale(${styles.CURRENT_LINE_SCALE})`,
-          textShadow: '0 2px 12px rgba(255, 255, 255, 0.3)'
+          transform: 'scale(1.5)',
+          transformOrigin: 'center',
+          textShadow: '0 2px 12px rgba(255, 255, 255, 0.3)',
+          margin: '16px 0'
         });
 
         // Update word-by-word highlighting if available
@@ -365,15 +370,16 @@ export class LyricsUI {
             top: scrollPosition,
             behavior: 'smooth'
           });
-        }, 50);
+        }, 0);
 
       } else {
         line.classList.remove('current');
         Object.assign(line.style, {
-          fontSize: isPast ? `${this.currentFontSize * 0.95}px` : `${this.currentFontSize}px`,
           fontWeight: '400',
-          transform: 'scale(1)',
+          transform: isPast ? 'scale(0.95)' : 'scale(1)',
+          transformOrigin: 'center',
           textShadow: 'none',
+          margin: '0',
           color: isPast 
             ? `rgba(255, 255, 255, ${styles.PAST_LINE_OPACITY})` 
             : `rgba(255, 255, 255, ${styles.FUTURE_LINE_OPACITY})`
@@ -443,11 +449,15 @@ export class LyricsUI {
 
     if (titleElement) {
       titleElement.textContent = title || 'Lyrics';
+      titleElement.style.opacity = '1';
+      titleElement.style.visibility = 'visible';
     }
 
     if (artistElement) {
       artistElement.textContent = artist;
       artistElement.style.display = artist ? 'block' : 'none';
+      artistElement.style.opacity = '1';
+      artistElement.style.visibility = 'visible';
     }
   }
 
@@ -617,7 +627,6 @@ export class LyricsUI {
    * Set font size
    */
   setFontSize(size) {
-    console.log('setFontSize called with:', size, 'lyricsContainer exists:', !!this.lyricsContainer);
     this.currentFontSize = size; // Store the current font size
     
     if (this.lyricsContainer) {
@@ -645,7 +654,6 @@ export class LyricsUI {
    */
   setHighlightMode(mode) {
     this.highlightMode = mode;
-    console.log('Highlight mode set to:', mode);
   }
 
   /**
@@ -815,7 +823,6 @@ export class LyricsUI {
     // Find YouTube's video controls container
     const rightControls = document.querySelector('.ytp-right-controls');
     if (!rightControls) {
-      console.warn('YouTube video controls not found');
       return;
     }
 
@@ -884,8 +891,6 @@ export class LyricsUI {
     
     // Insert at the beginning of right controls
     rightControls.insertBefore(container, rightControls.firstChild);
-    
-    console.log('Lyrics controls added to video player');
     
     return { settingsBtn, settingsPanel, container };
   }

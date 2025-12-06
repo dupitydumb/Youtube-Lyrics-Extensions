@@ -322,15 +322,14 @@ export class BackgroundManager {
   async loadSettings() {
     try {
       if (typeof chrome === 'undefined' || !chrome.storage) {
-        console.warn('Chrome storage API not available, using defaults');
         return;
       }
       const data = await chrome.storage.sync.get(['backgroundMode', 'gradientTheme', 'customColors']);
       this.mode = data.backgroundMode || 'album';
       this.gradientTheme = data.gradientTheme || 'random';
-      this.customColors = data.customColors || [];
+      this.customColors = result.customColors || [];
     } catch (error) {
-      console.error('Failed to load background settings:', error);
+      // Failed to load background settings
     }
   }
 
@@ -348,7 +347,7 @@ export class BackgroundManager {
         customColors: this.customColors
       });
     } catch (error) {
-      console.error('Failed to save background settings:', error);
+      // Failed to save background settings
     }
   }
 }

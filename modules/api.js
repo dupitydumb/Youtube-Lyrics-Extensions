@@ -16,7 +16,6 @@ export class LyricsAPI {
   async loadCache() {
     try {
       if (typeof chrome === 'undefined' || !chrome.storage) {
-        console.warn('Chrome storage API not available, skipping cache load');
         return;
       }
       const result = await chrome.storage.local.get(['lyricsCache']);
@@ -25,7 +24,7 @@ export class LyricsAPI {
         this.cleanExpiredCache();
       }
     } catch (error) {
-      console.error('Failed to load cache:', error);
+      // Failed to load cache
     }
   }
 
@@ -40,7 +39,7 @@ export class LyricsAPI {
       const cacheObject = Object.fromEntries(this.cache);
       await chrome.storage.local.set({ lyricsCache: cacheObject });
     } catch (error) {
-      console.error('Failed to save cache:', error);
+      // Failed to save cache
     }
   }
 
@@ -93,13 +92,10 @@ export class LyricsAPI {
     // Check cache first
     const cached = this.getCached(query);
     if (cached) {
-      console.log('✅ Lyrics found in cache');
       return cached;
     }
 
     const url = `${API.BASE_URL}${API.SEARCH_ENDPOINT}?q=${encodeURIComponent(query)}`;
-    
-    console.log('🌐 API Request URL:', url);
     
     try {
       const controller = new AbortController();
@@ -114,16 +110,11 @@ export class LyricsAPI {
 
       clearTimeout(timeoutId);
 
-      console.log('🌐 API Response status:', response.status);
-
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      
-      console.log('🌐 API Response data type:', Array.isArray(data) ? 'Array' : typeof data);
-      console.log('🌐 API Response length:', data?.length);
       
       // Cache the result
       this.setCache(query, data);
@@ -131,13 +122,9 @@ export class LyricsAPI {
       return data;
 
     } catch (error) {
-      console.error(`Lyrics search failed (attempt ${attemptCount + 1}):`, error);
-
       // Retry logic with exponential backoff
       if (attemptCount < API.RETRY_ATTEMPTS) {
         const delay = API.RETRY_DELAY * Math.pow(2, attemptCount);
-        console.log(`Retrying in ${delay}ms...`);
-        
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.searchLyrics(query, attemptCount + 1);
       }
@@ -224,7 +211,6 @@ export class LyricsAPI {
 
       return syncedLyrics.sort((a, b) => a.time - b.time);
     } catch (error) {
-      console.error('Failed to parse synced lyrics:', error);
       return [];
     }
   }
