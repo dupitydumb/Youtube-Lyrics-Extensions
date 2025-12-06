@@ -6,12 +6,20 @@
 (function() {
   'use strict';
 
+  // Make chrome API available globally for modules
+  window.chrome = chrome;
+
   // Load modules in order
   const modules = [
     'modules/constants.js',
+    'modules/events.js',
+    'modules/settings.js',
     'modules/api.js',
     'modules/sync.js',
     'modules/ui.js',
+    'modules/background.js',
+    'modules/youtube.js',
+    'modules/fullscreen.js',
     'modules/main.js'
   ];
 

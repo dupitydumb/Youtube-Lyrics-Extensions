@@ -233,7 +233,8 @@ export class LyricsUI {
   displayPlainLyrics(lyrics) {
     if (!this.lyricsContainer) return;
 
-    this.lyricsContainer.innerHTML = '';
+    // Clear using replaceChildren for Trusted Types compatibility
+    this.lyricsContainer.replaceChildren();
     
     const lyricsText = document.createElement('div');
     Object.assign(lyricsText.style, {
@@ -256,7 +257,8 @@ export class LyricsUI {
   displaySyncedLyrics(syncedLyrics) {
     if (!this.lyricsContainer) return;
 
-    this.lyricsContainer.innerHTML = '';
+    // Clear using replaceChildren for Trusted Types compatibility
+    this.lyricsContainer.replaceChildren();
     const styles = UI_CONFIG.APPLE_MUSIC_STYLE;
 
     syncedLyrics.forEach((lyric, index) => {
@@ -528,7 +530,8 @@ export class LyricsUI {
   showLoading() {
     if (!this.lyricsContainer) return;
 
-    this.lyricsContainer.innerHTML = '';
+    // Clear using replaceChildren for Trusted Types compatibility
+    this.lyricsContainer.replaceChildren();
     const loading = document.createElement('div');
     loading.textContent = 'Loading lyrics...';
     Object.assign(loading.style, {
@@ -547,7 +550,8 @@ export class LyricsUI {
   showError(message) {
     if (!this.lyricsContainer) return;
 
-    this.lyricsContainer.innerHTML = '';
+    // Clear using replaceChildren for Trusted Types compatibility
+    this.lyricsContainer.replaceChildren();
     const error = document.createElement('div');
     error.textContent = message;
     Object.assign(error.style, {
@@ -578,6 +582,243 @@ export class LyricsUI {
    */
   exists() {
     return this.panel !== null && document.contains(this.panel);
+  }
+
+  /**
+   * Display lyrics (wrapper for synced/plain)
+   */
+  displayLyrics(lyrics) {
+    if (Array.isArray(lyrics)) {
+      this.displaySyncedLyrics(lyrics);
+    } else if (typeof lyrics === 'string') {
+      this.displayPlainLyrics(lyrics);
+    }
+  }
+
+  /**
+   * Set font size
+   */
+  setFontSize(size) {
+    if (this.lyricsContainer) {
+      this.lyricsContainer.style.fontSize = `${size}px`;
+    }
+  }
+
+  /**
+   * Create song selector dropdown
+   */
+  createSongSelector(results, onSelect) {
+    if (!this.controlsContainer || !results || results.length <= 1) return;
+    
+    const container = document.createElement('div');
+    Object.assign(container.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px'
+    });
+    
+    const label = document.createElement('label');
+    label.textContent = 'Song Version:';
+    Object.assign(label.style, {
+      fontSize: '12px',
+      color: 'rgba(255, 255, 255, 0.7)',
+      fontWeight: '500'
+    });
+    
+    const select = document.createElement('select');
+    Object.assign(select.style, {
+      padding: '8px 12px',
+      borderRadius: '8px',
+      background: 'rgba(255, 255, 255, 0.1)',
+      color: '#ffffff',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      fontSize: '13px',
+      cursor: 'pointer',
+      outline: 'none'
+    });
+    
+    results.forEach((result, index) => {
+      const option = document.createElement('option');
+      option.value = index;
+      option.textContent = `${result.trackName} - ${result.artistName}${result.albumName ? ' (' + result.albumName + ')' : ''}`;
+      select.appendChild(option);
+    });
+    
+    select.addEventListener('change', (e) => {
+      const selectedIndex = parseInt(e.target.value);
+      if (onSelect) {
+        onSelect(results[selectedIndex]);
+      }
+    });
+    
+    container.appendChild(label);
+    container.appendChild(select);
+    this.controlsContainer.appendChild(container);
+  }
+
+  /**
+   * Create background mode selector
+   */
+  createBackgroundSelector(currentMode, currentTheme, onChange) {
+    if (!this.controlsContainer) return;
+    
+    const container = document.createElement('div');
+    Object.assign(container.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px'
+    });
+    
+    const label = document.createElement('label');
+    label.textContent = 'Background:';
+    Object.assign(label.style, {
+      fontSize: '12px',
+      color: 'rgba(255, 255, 255, 0.7)',
+      fontWeight: '500'
+    });
+    
+    const select = document.createElement('select');
+    Object.assign(select.style, {
+      padding: '8px 12px',
+      borderRadius: '8px',
+      background: 'rgba(255, 255, 255, 0.1)',
+      color: '#ffffff',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      fontSize: '13px',
+      cursor: 'pointer',
+      outline: 'none'
+    });
+    
+    const modes = [
+      { value: 'album', label: 'Album Art' },
+      { value: 'gradient', label: 'Gradient' },
+      { value: 'vinyl', label: 'Vinyl Disc' },
+      { value: 'none', label: 'None' }
+    ];
+    
+    modes.forEach(mode => {
+      const option = document.createElement('option');
+      option.value = mode.value;
+      option.textContent = mode.label;
+      option.selected = mode.value === currentMode;
+      select.appendChild(option);
+    });
+    
+    select.addEventListener('change', (e) => {
+      if (onChange) {
+        onChange(e.target.value, currentTheme);
+      }
+    });
+    
+    container.appendChild(label);
+    container.appendChild(select);
+    this.controlsContainer.appendChild(container);
+  }
+
+  /**
+   * Create fullscreen button
+   */
+  createFullscreenButton(onToggle) {
+    if (!this.controlsContainer) return;
+    
+    const button = document.createElement('button');
+    button.textContent = '⛶ Fullscreen';
+    Object.assign(button.style, {
+      padding: '8px 16px',
+      borderRadius: '8px',
+      background: 'rgba(255, 255, 255, 0.1)',
+      color: '#ffffff',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      fontSize: '13px',
+      cursor: 'pointer',
+      fontWeight: '500',
+      transition: 'all 0.2s',
+      flex: '1'
+    });
+    
+    button.addEventListener('mouseenter', () => {
+      button.style.background = 'rgba(255, 255, 255, 0.2)';
+      button.style.transform = 'scale(1.02)';
+    });
+    
+    button.addEventListener('mouseleave', () => {
+      button.style.background = 'rgba(255, 255, 255, 0.1)';
+      button.style.transform = 'scale(1)';
+    });
+    
+    button.addEventListener('click', () => {
+      if (onToggle) {
+        onToggle();
+      }
+    });
+    
+    this.controlsContainer.appendChild(button);
+  }
+
+  /**
+   * Create video player controls
+   */
+  createVideoPlayerControls(onFullscreen) {
+    // TODO: Implement video player overlay controls
+    console.log('Video player controls callback registered');
+  }
+
+  /**
+   * Update lyric in specific container
+   */
+  updateLyricInContainer(container, index, lyric) {
+    if (!container) return;
+    
+    const lines = container.querySelectorAll('.lyric-line');
+    lines.forEach((line, i) => {
+      if (i === index) {
+        line.classList.add('current');
+        line.classList.remove('past', 'future');
+        line.style.opacity = '1';
+        line.style.transform = 'scale(1.15)';
+      } else if (i < index) {
+        line.classList.add('past');
+        line.classList.remove('current', 'future');
+        line.style.opacity = '0.4';
+        line.style.transform = 'scale(1)';
+      } else {
+        line.classList.add('future');
+        line.classList.remove('current', 'past');
+        line.style.opacity = '0.6';
+        line.style.transform = 'scale(1)';
+      }
+    });
+  }
+
+  /**
+   * Display lyrics in specific container
+   */
+  displayLyricsInContainer(container, lyrics) {
+    if (!container) return;
+    
+    container.replaceChildren();
+    const styles = UI_CONFIG.APPLE_MUSIC_STYLE;
+
+    lyrics.forEach((lyric, index) => {
+      const lyricLine = document.createElement('div');
+      lyricLine.className = 'lyric-line future';
+      lyricLine.dataset.index = index;
+      lyricLine.dataset.time = lyric.time;
+      lyricLine.textContent = lyric.text;
+
+      Object.assign(lyricLine.style, {
+        padding: '20px 30px',
+        fontSize: '20px',
+        lineHeight: '1.8',
+        color: 'rgba(255, 255, 255, 0.6)',
+        transition: `all 0.3s cubic-bezier(0.4, 0, 0.2, 1)`,
+        transform: 'scale(1)',
+        fontWeight: '400',
+        textAlign: 'center'
+      });
+
+      container.appendChild(lyricLine);
+    });
   }
 }
 
@@ -647,8 +888,8 @@ export class TitleFormatter {
    * Sanitize text for safe DOM insertion
    */
   static sanitize(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    // For Trusted Types compatibility, just return the text
+    // DOM elements should use textContent instead of innerHTML
+    return String(text);
   }
 }

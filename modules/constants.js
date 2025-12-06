@@ -112,3 +112,33 @@ export const CACHE_CONFIG = {
   MAX_SIZE: 50, // Maximum number of cached lyrics
   EXPIRY_TIME: 86400000 // 24 hours in milliseconds
 };
+
+// Preset Gradients for Background
+export const PRESET_GRADIENTS = [
+  { name: 'Sunset', colors: ['#FF6B6B', '#FFE66D', '#4ECDC4', '#FF6B9D'] },
+  { name: 'Ocean', colors: ['#667eea', '#764ba2', '#f093fb', '#4facfe'] },
+  { name: 'Forest', colors: ['#56ab2f', '#a8e063', '#38ef7d', '#11998e'] },
+  { name: 'Fire', colors: ['#f83600', '#f9d423', '#ff0844', '#ffb199'] },
+  { name: 'Purple Dream', colors: ['#c471f5', '#fa71cd', '#a770ef', '#fdb99b'] },
+  { name: 'Cool Blues', colors: ['#2193b0', '#6dd5ed', '#00d2ff', '#3a7bd5'] },
+  { name: 'Warm Sunset', colors: ['#ff9a56', '#ff6a00', '#ee0979', '#ff6a00'] },
+  { name: 'Northern Lights', colors: ['#00c6ff', '#0072ff', '#00f260', '#0575e6'] },
+  { name: 'Peach', colors: ['#ffecd2', '#fcb69f', '#ff9a9e', '#fecfef'] },
+  { name: 'Neon', colors: ['#f953c6', '#b91d73', '#12c2e9', '#c471ed'] }
+];
+
+// Export CONSTANTS object for compatibility
+export const CONSTANTS = {
+  API,
+  SELECTORS,
+  URL_PATTERNS,
+  FILTER_WORDS,
+  KOREAN_CHAR_RANGE,
+  UI_CONFIG,
+  STORAGE_KEYS,
+  ERROR_MESSAGES,
+  CACHE_CONFIG,
+  PRESET_GRADIENTS,
+  KOREAN_RANGE: KOREAN_CHAR_RANGE,
+  MESSAGES: ERROR_MESSAGES
+};
