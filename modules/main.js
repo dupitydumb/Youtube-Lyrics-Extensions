@@ -11,6 +11,7 @@ import { SettingsManager } from './settings.js';
 import { FullscreenManager } from './fullscreen.js';
 import { EventBus, EVENTS } from './events.js';
 import { FILTER_WORDS } from './constants.js';
+import { Romanizer } from './romanization.js';
 
 class YouTubeLyricsApp {
   constructor() {
@@ -99,6 +100,14 @@ class YouTubeLyricsApp {
         this.highlightMode = changes.highlightMode;
         this.ui.setHighlightMode(changes.highlightMode);
       }
+
+      if (changes.showRomanization !== undefined) {
+        this.showRomanization = changes.showRomanization === true;
+        // Re-render lyrics with romanization if available
+        if (this.currentLyrics && this.ui.lyricsContainer) {
+          this.renderCurrentLyrics();
+        }
+      }
       
       if (changes.backgroundMode !== undefined || 
           changes.gradientTheme !== undefined || 
@@ -133,6 +142,15 @@ class YouTubeLyricsApp {
         } else if (message.type === 'updateHighlightMode') {
           this.highlightMode = message.highlightMode;
           this.ui.setHighlightMode(message.highlightMode);
+        } else if (message.type === 'updateRomanization') {
+          this.settings.set('showRomanization', message.showRomanization === true);
+          if (this.currentLyrics) {
+            const rebuilt = this.applyRomanizationIfNeeded(
+              this.currentLyrics.map(l => ({ time: l.time, text: l.text, words: l.words }))
+            );
+            this.currentLyrics = rebuilt;
+            this.renderCurrentLyrics();
+          }
         } else if (message.type === 'updatePlaybackMode') {
           // Handle playback mode changes if needed
         }
@@ -204,6 +222,7 @@ class YouTubeLyricsApp {
           syncDelay: this.settings.get('syncDelay'),
           backgroundMode: this.settings.get('backgroundMode'),
           highlightMode: this.settings.get('highlightMode'),
+          showRomanization: this.settings.get('showRomanization') === true,
           onFontSizeChange: (value) => {
             this.settings.set('fontSize', value);
             this.ui.setFontSize(value);
@@ -226,6 +245,18 @@ class YouTubeLyricsApp {
             this.settings.set('gradientTheme', value);
             this.background.gradientTheme = value;
             this.background.updateBackground(this.albumArtUrl);
+          },
+          onRomanizationChange: (enabled) => {
+            this.settings.set('showRomanization', enabled);
+            // Recompute romanization for current lyrics
+            if (this.currentLyrics) {
+              // If we have synced lyrics, rebuild with/without romanization
+              const rebuilt = this.applyRomanizationIfNeeded(
+                this.currentLyrics.map(l => ({ time: l.time, text: l.text, words: l.words }))
+              );
+              this.currentLyrics = rebuilt;
+              this.renderCurrentLyrics();
+            }
           }
         }
       );
@@ -266,38 +297,95 @@ class YouTubeLyricsApp {
   }
 
   /**
-   * Load lyrics for video
+   * Load lyrics for video with multi-strategy search
    */
   async loadLyrics(videoInfo) {
     try {
-      // Try with video title only first
+      // Import TitleParser from api module
+      const { TitleParser } = await import('./api.js');
+      
+      // Parse the title to extract song and artist intelligently
+      const parsed = TitleParser.parseTitle(videoInfo.title, videoInfo.artist);
+      
+      // Define search strategies in priority order
+      const strategies = [
+        // Strategy 1: Parsed song + parsed artist (highest confidence)
+        {
+          name: 'parsed_full',
+          query: `${parsed.song} ${parsed.artist}`.trim(),
+          songName: parsed.song,
+          artistName: parsed.artist,
+          enabled: parsed.song && parsed.artist && parsed.confidence > 0.6
+        },
+        // Strategy 2: Formatted title + channel name
+        {
+          name: 'formatted_with_channel',
+          query: `${TitleParser.formatForSearch(videoInfo.title)} ${videoInfo.artist}`.trim(),
+          songName: videoInfo.title,
+          artistName: videoInfo.artist,
+          enabled: videoInfo.title && videoInfo.artist
+        },
+        // Strategy 3: Raw title + channel
+        {
+          name: 'raw_with_channel',
+          query: `${videoInfo.title} ${videoInfo.artist}`.trim(),
+          songName: videoInfo.title,
+          artistName: videoInfo.artist,
+          enabled: videoInfo.title && videoInfo.artist
+        },
+        // Strategy 4: Parsed song only (for official channel uploads like "Sparks" by Coldplay)
+        {
+          name: 'parsed_song_only',
+          query: parsed.song,
+          songName: parsed.song,
+          artistName: parsed.artist,
+          enabled: parsed.song && parsed.confidence > 0.7
+        },
+        // Strategy 5: Formatted title only
+        {
+          name: 'formatted_title',
+          query: TitleParser.formatForSearch(videoInfo.title),
+          songName: videoInfo.title,
+          artistName: videoInfo.artist,
+          enabled: videoInfo.title
+        },
+        // Strategy 6: Aggressive format (formatSongOnly equivalent)
+        {
+          name: 'aggressive_format',
+          query: this.youtube.formatSongOnly(videoInfo.title, FILTER_WORDS),
+          songName: videoInfo.title,
+          artistName: videoInfo.artist,
+          enabled: videoInfo.title
+        },
+        // Strategy 7: Raw title as last resort
+        {
+          name: 'raw_title',
+          query: videoInfo.title,
+          songName: videoInfo.title,
+          artistName: videoInfo.artist,
+          enabled: videoInfo.title
+        }
+      ];
+      
+      // Try each strategy until we get good results
       let results = null;
+      let successfulStrategy = null;
       
-      if (videoInfo.title) {
-        const titleOnlyQuery = this.youtube.formatTitle(videoInfo.title, FILTER_WORDS);
-        
-        if (titleOnlyQuery.length >= 3) {
-          results = await this.api.searchLyrics(titleOnlyQuery);
-        }
-      }
-      
-      // If no results with title only, try with title + artist
-      if ((!results || results.length === 0) && videoInfo.artist) {
-        const searchParts = [];
-        if (videoInfo.title) {
-          searchParts.push(videoInfo.title);
-        }
-        if (videoInfo.artist) {
-          searchParts.push(videoInfo.artist);
+      for (const strategy of strategies) {
+        if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
+          continue;
         }
         
-        const rawQuery = searchParts.join(' ');
-        const query = this.youtube.formatTitle(rawQuery, FILTER_WORDS);
-        
-        if (query.length >= 3) {
-          results = await this.api.searchLyrics(query);
-        } else {
-          results = await this.api.searchLyrics(rawQuery);
+        try {
+          results = await this.api.searchLyrics(strategy.query);
+          
+          if (results && results.length > 0) {
+            successfulStrategy = strategy;
+            break;
+          }
+        } catch (error) {
+          // Continue to next strategy
+          continue;
         }
       }
       
@@ -306,7 +394,13 @@ class YouTubeLyricsApp {
         return;
       }
       
-      this.processLyricsResults(results, videoInfo);
+      // Process results with enhanced metadata
+      this.processLyricsResults(
+        results, 
+        videoInfo, 
+        successfulStrategy ? successfulStrategy.songName : videoInfo.title,
+        successfulStrategy ? successfulStrategy.artistName : videoInfo.artist
+      );
       
     } catch (error) {
       this.ui.showError('Failed to load lyrics');
@@ -316,9 +410,13 @@ class YouTubeLyricsApp {
   /**
    * Process lyrics results
    */
-  async processLyricsResults(results, videoInfo) {
-    // Find best match
-    const bestMatch = this.api.findBestMatch(results, videoInfo.artist);
+  async processLyricsResults(results, videoInfo, songName = '', artistName = '') {
+    // Find best match with enhanced fuzzy matching
+    const bestMatch = this.api.findBestMatch(
+      results, 
+      artistName || videoInfo.artist,
+      songName || videoInfo.title
+    );
     
     if (!bestMatch) {
       this.ui.showError('No lyrics found for this song');
@@ -328,13 +426,15 @@ class YouTubeLyricsApp {
     // Parse synced lyrics
     if (bestMatch.syncedLyrics) {
       const syncedLyrics = this.api.parseSyncedLyrics(bestMatch.syncedLyrics);
-      this.currentLyrics = syncedLyrics;
+      // Attach romanization if enabled
+      const withRoman = this.applyRomanizationIfNeeded(syncedLyrics);
+      this.currentLyrics = withRoman;
         
         // Update title and artist in header
         this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist);
         
         // Display lyrics
-        this.ui.displaySyncedLyrics(syncedLyrics);
+        this.ui.displaySyncedLyrics(this.currentLyrics);
         
         // Apply stored font size
         const storedFontSize = this.settings.get('fontSize');
@@ -363,7 +463,9 @@ class YouTubeLyricsApp {
         this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist);
         
         // Display plain lyrics
-        this.ui.displayPlainLyrics(bestMatch.plainLyrics);
+        const plain = bestMatch.plainLyrics;
+        const romanizedPlain = this.applyRomanizationToPlainIfNeeded(plain);
+        this.ui.displayPlainLyrics(romanizedPlain);
         
         // Apply stored font size
         const storedFontSize = this.settings.get('fontSize');
@@ -375,6 +477,35 @@ class YouTubeLyricsApp {
       } else {
         this.ui.showError('No lyrics available for this song');
       }
+  }
+
+  renderCurrentLyrics() {
+    // Re-display current lyrics respecting romanization setting
+    if (!this.currentLyrics) return;
+    this.ui.displaySyncedLyrics(this.currentLyrics);
+    if (this.sync?.currentIndex >= 0) {
+      this.ui.updateCurrentLyric(this.sync.currentIndex);
+    }
+  }
+
+  applyRomanizationIfNeeded(syncedLyrics) {
+    const enabled = this.settings.get('showRomanization') === true;
+    if (!enabled) return syncedLyrics;
+    return syncedLyrics.map(line => {
+      const roman = Romanizer.romanize(line.text);
+      return roman ? { ...line, romanized: roman } : line;
+    });
+  }
+
+  applyRomanizationToPlainIfNeeded(plainText) {
+    const enabled = this.settings.get('showRomanization') === true;
+    if (!enabled || !plainText) return plainText;
+    const lines = plainText.split(/\r?\n/);
+    const out = lines.map(l => {
+      const r = Romanizer.romanize(l);
+      return r ? `${l}\n${r}` : l;
+    });
+    return out.join('\n');
   }
 
   /**

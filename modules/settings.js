@@ -11,7 +11,8 @@ export class SettingsManager {
       backgroundMode: 'album',
       gradientTheme: 'random',
       customColors: [],
-      highlightMode: 'line' // 'line' or 'word'
+      highlightMode: 'line', // 'line' or 'word'
+      showRomanization: false // Show romanization for Korean/Japanese lyrics
     };
     
     this.settings = { ...this.defaults };

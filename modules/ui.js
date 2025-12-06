@@ -1,4 +1,4 @@
-import { SELECTORS, UI_CONFIG, FILTER_WORDS, KOREAN_CHAR_RANGE } from './constants.js';
+import { SELECTORS, UI_CONFIG } from './constants.js';
 
 /**
  * UI Module - Handles all UI creation and manipulation with Apple Music styling
@@ -273,6 +273,9 @@ export class LyricsUI {
       lyricLine.dataset.index = index;
       lyricLine.dataset.time = lyric.time;
       
+      // Create a container for the main lyric text
+      const textContainer = document.createElement('div');
+      
       // Check if lyric has word-level timing
       if (lyric.words && lyric.words.length > 0) {
         // Create word-by-word display
@@ -282,16 +285,32 @@ export class LyricsUI {
           wordSpan.textContent = wordData.word;
           wordSpan.dataset.wordIndex = wordIndex;
           wordSpan.dataset.wordTime = wordData.time;
-          lyricLine.appendChild(wordSpan);
+          textContainer.appendChild(wordSpan);
           
           // Add space after word (except last word)
           if (wordIndex < lyric.words.length - 1) {
-            lyricLine.appendChild(document.createTextNode(' '));
+            textContainer.appendChild(document.createTextNode(' '));
           }
         });
       } else {
         // Regular line-by-line display
-        lyricLine.textContent = lyric.text;
+        textContainer.textContent = lyric.text;
+      }
+      
+      lyricLine.appendChild(textContainer);
+
+      // Optional romanization displayed beneath
+      if (this.settingsRef && this.settingsRef.showRomanization && lyric.romanized) {
+        const roman = document.createElement('div');
+        roman.className = 'romanization-text';
+        roman.textContent = lyric.romanized;
+        Object.assign(roman.style, {
+          marginTop: '6px',
+          fontSize: '0.85em',
+          color: 'rgba(255,255,255,0.5)',
+          fontStyle: 'italic'
+        });
+        lyricLine.appendChild(roman);
       }
 
       Object.assign(lyricLine.style, {
@@ -993,6 +1012,20 @@ export class LyricsUI {
       },
       {
         type: 'submenu',
+        label: 'Romanization',
+        currentValue: (settings?.showRomanization ? 'On' : 'Off'),
+        options: [
+          { value: true, label: 'On' },
+          { value: false, label: 'Off' }
+        ],
+        selected: settings?.showRomanization === true,
+        onChange: (value) => {
+          if (this.settingsRef) this.settingsRef.showRomanization = (value === true);
+          if (settings?.onRomanizationChange) settings.onRomanizationChange(value === true);
+        }
+      },
+      {
+        type: 'submenu',
         label: 'Highlight mode',
         currentValue: this.getHighlightLabel(settings?.highlightMode || 'line'),
         options: [
@@ -1195,6 +1228,8 @@ export class LyricsUI {
               valueDiv.textContent = this.getHighlightLabel(value);
             } else if (item.label === 'Gradient theme') {
               valueDiv.textContent = this.getGradientThemeLabel(value);
+            } else if (item.label === 'Romanization') {
+              valueDiv.textContent = (value === true) ? 'On' : 'Off';
             } else {
               valueDiv.textContent = value;
             }
@@ -1209,6 +1244,8 @@ export class LyricsUI {
                   this.settingsRef.highlightMode = value;
                 } else if (item.label === 'Gradient theme') {
                   this.settingsRef.gradientTheme = value;
+                } else if (item.label === 'Romanization') {
+                  this.settingsRef.showRomanization = (value === true);
                 }
               }
             }
@@ -1436,77 +1473,5 @@ export class LyricsUI {
 
       container.appendChild(lyricLine);
     });
-  }
-}
-
-/**
- * Utility functions for title formatting
- */
-export class TitleFormatter {
-  /**
-   * Format video title for lyrics search
-   */
-  static formatTitle(title) {
-    if (!title) return '';
-
-    const notAllowed = [...FILTER_WORDS.BASIC];
-    
-    // Add Korean characters to filter list
-    for (let i = KOREAN_CHAR_RANGE.START; i <= KOREAN_CHAR_RANGE.END; i++) {
-      notAllowed.push(String.fromCharCode(i));
-    }
-
-    let formatted = title.toLowerCase().split(' ');
-    formatted = formatted
-      .filter(word => !notAllowed.includes(word))
-      .join(' ');
-
-    // If title has a pipe and dash, remove text after pipe
-    if (formatted.includes('|') && formatted.includes('-')) {
-      formatted = formatted.split('|')[0];
-    }
-
-    return formatted.trim();
-  }
-
-  /**
-   * Format title to song name only (more aggressive filtering)
-   */
-  static formatSongOnly(title) {
-    if (!title) return '';
-
-    const notAllowed = FILTER_WORDS.EXTENDED;
-
-    let formatted = title.toLowerCase().split(' ');
-    formatted = formatted
-      .filter(word => 
-        !notAllowed.map(w => w.toLowerCase()).includes(word) && 
-        !/[\uAC00-\uD7AF]/.test(word)
-      )
-      .join(' ');
-
-    // Remove text after pipe
-    if (formatted.includes('|')) {
-      formatted = formatted.split('|')[0];
-    }
-
-    // Remove text in brackets
-    formatted = formatted.replace(/\[.*?\]/g, '');
-    formatted = formatted.replace(/\(.*?\)/g, '');
-    
-    // Remove quotes
-    formatted = formatted.replace(/''/g, '');
-    formatted = formatted.replace(/"/g, '');
-
-    return formatted.trim();
-  }
-
-  /**
-   * Sanitize text for safe DOM insertion
-   */
-  static sanitize(text) {
-    // For Trusted Types compatibility, just return the text
-    // DOM elements should use textContent instead of innerHTML
-    return String(text);
   }
 }
