@@ -11,6 +11,8 @@ export class LyricsUI {
     this.lyricsContainer = null;
     this.controlsContainer = null;
     this.currentStyle = 'apple-music';
+    this.settingsRef = null; // Store settings reference for updates
+    this.currentFontSize = 16; // Store current font size
   }
 
   /**
@@ -40,10 +42,6 @@ export class LyricsUI {
     this.lyricsContainer.id = 'lyrics-display';
     this.applyLyricsContainerStyles(this.lyricsContainer);
     this.panel.appendChild(this.lyricsContainer);
-
-    // Create controls
-    this.controlsContainer = this.createControls();
-    this.panel.appendChild(this.controlsContainer);
 
     this.container.appendChild(this.panel);
     
@@ -344,7 +342,7 @@ export class LyricsUI {
         line.classList.add('current');
         Object.assign(line.style, {
           color: '#ffffff',
-          fontSize: styles.FONT_SIZE_CURRENT,
+          fontSize: `${this.currentFontSize * 1.5}px`,
           fontWeight: '600',
           transform: `scale(${styles.CURRENT_LINE_SCALE})`,
           textShadow: '0 2px 12px rgba(255, 255, 255, 0.3)'
@@ -371,7 +369,7 @@ export class LyricsUI {
       } else {
         line.classList.remove('current');
         Object.assign(line.style, {
-          fontSize: styles.FONT_SIZE_BASE,
+          fontSize: isPast ? `${this.currentFontSize * 0.95}px` : `${this.currentFontSize}px`,
           fontWeight: '400',
           transform: 'scale(1)',
           textShadow: 'none',
@@ -578,6 +576,16 @@ export class LyricsUI {
   }
 
   /**
+   * Remove video player controls
+   */
+  removeVideoPlayerControls() {
+    const container = document.querySelector('#lyrics-video-controls-container');
+    if (container) {
+      container.remove();
+    }
+  }
+
+  /**
    * Check if panel exists
    */
   exists() {
@@ -599,8 +607,26 @@ export class LyricsUI {
    * Set font size
    */
   setFontSize(size) {
+    console.log('setFontSize called with:', size, 'lyricsContainer exists:', !!this.lyricsContainer);
+    this.currentFontSize = size; // Store the current font size
+    
     if (this.lyricsContainer) {
-      this.lyricsContainer.style.fontSize = `${size}px`;
+      // Set base font size
+      this.lyricsContainer.style.setProperty('--lyrics-font-size', `${size}px`);
+      this.lyricsContainer.style.setProperty('--lyrics-current-font-size', `${size * 1.5}px`);
+      this.lyricsContainer.style.setProperty('--lyrics-past-font-size', `${size * 0.95}px`);
+      
+      // Also update all lyric lines directly
+      const lyricLines = this.lyricsContainer.querySelectorAll('.lyric-line');
+      lyricLines.forEach(line => {
+        if (line.classList.contains('current')) {
+          line.style.fontSize = `${size * 1.5}px`;
+        } else if (line.classList.contains('past')) {
+          line.style.fontSize = `${size * 0.95}px`;
+        } else {
+          line.style.fontSize = `${size}px`;
+        }
+      });
     }
   }
 
@@ -758,9 +784,484 @@ export class LyricsUI {
   /**
    * Create video player controls
    */
-  createVideoPlayerControls(onFullscreen) {
-    // TODO: Implement video player overlay controls
-    console.log('Video player controls callback registered');
+  createVideoPlayerControls(onFullscreen, onTogglePanel, settings) {
+    // Store settings reference for real-time updates
+    this.settingsRef = settings;
+    
+    // Remove existing buttons if present
+    const existingContainer = document.querySelector('#lyrics-video-controls-container');
+    if (existingContainer) {
+      existingContainer.remove();
+    }
+
+    // Find YouTube's video controls container
+    const rightControls = document.querySelector('.ytp-right-controls');
+    if (!rightControls) {
+      console.warn('YouTube video controls not found');
+      return;
+    }
+
+    // Create container for buttons
+    const container = document.createElement('div');
+    container.id = 'lyrics-video-controls-container';
+    container.style.cssText = 'display: flex; align-items: center; gap: 4px; margin-right: 8px; position: relative;';
+
+    // Create settings button with lyrics icon
+    const settingsBtn = document.createElement('button');
+    settingsBtn.id = 'lyrics-settings-btn';
+    settingsBtn.className = 'ytp-button';
+    settingsBtn.setAttribute('aria-label', 'Lyrics Settings');
+    settingsBtn.setAttribute('title', 'Lyrics Settings');
+    settingsBtn.style.cssText = 'width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none; color: white; opacity: 0.9;';
+    
+    // Create lyrics note icon SVG
+    const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    iconSvg.setAttribute('viewBox', '0 0 24 24');
+    iconSvg.setAttribute('fill', 'none');
+    iconSvg.style.width = '24px';
+    iconSvg.style.height = '24px';
+    
+    const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    iconPath.setAttribute('d', 'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z');
+    iconPath.setAttribute('fill', 'currentColor');
+    
+    iconSvg.appendChild(iconPath);
+    settingsBtn.appendChild(iconSvg);
+    
+    // Assemble container first so it exists before creating panel
+    container.appendChild(settingsBtn);
+    
+    // Create settings popup panel (pass container to avoid null reference)
+    const settingsPanel = this.createSettingsPanel(settings, onFullscreen, onTogglePanel, container);
+    settingsPanel.style.display = 'none';
+    container.appendChild(settingsPanel);
+    
+    // Toggle settings panel
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isVisible = settingsPanel.style.display !== 'none';
+      settingsPanel.style.display = isVisible ? 'none' : 'block';
+      settingsBtn.style.opacity = isVisible ? '0.9' : '1';
+    });
+    
+    settingsBtn.addEventListener('mouseenter', () => {
+      if (settingsPanel.style.display === 'none') {
+        settingsBtn.style.opacity = '1';
+      }
+    });
+    
+    settingsBtn.addEventListener('mouseleave', () => {
+      if (settingsPanel.style.display === 'none') {
+        settingsBtn.style.opacity = '0.9';
+      }
+    });
+    
+    // Close panel when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!container.contains(e.target)) {
+        settingsPanel.style.display = 'none';
+        settingsBtn.style.opacity = '0.9';
+      }
+    });
+    
+    // Insert at the beginning of right controls
+    rightControls.insertBefore(container, rightControls.firstChild);
+    
+    console.log('Lyrics controls added to video player');
+    
+    return { settingsBtn, settingsPanel, container };
+  }
+
+  /**
+   * Create YouTube-style settings popup panel
+   */
+  createSettingsPanel(settings, onFullscreen, onTogglePanel, container) {
+    const panel = document.createElement('div');
+    panel.id = 'lyrics-settings-panel';
+    panel.style.cssText = `
+      position: absolute;
+      bottom: 48px;
+      right: 0;
+      width: 272px;
+      background: rgba(28, 28, 28, 0.97);
+      border-radius: 2px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 2px 10px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      z-index: 9999;
+      font-family: Roboto, Arial, sans-serif;
+      font-size: 14px;
+      color: #eee;
+    `;
+    
+    // Create menu items
+    const menuItems = [
+      {
+        type: 'button',
+        label: 'Show lyrics panel',
+        checked: true,
+        onClick: () => {
+          menuItems[0].checked = !menuItems[0].checked;
+          if (onTogglePanel) onTogglePanel();
+          // Update checkmark
+          const items = panel.querySelectorAll('div[data-menu-item]');
+          items[0].querySelector('div:last-child').style.opacity = menuItems[0].checked ? '1' : '0';
+        }
+      },
+      {
+        type: 'button',
+        label: 'Fullscreen karaoke',
+        onClick: () => {
+          panel.style.display = 'none';
+          if (onFullscreen) onFullscreen();
+        }
+      },
+      { type: 'separator' },
+      {
+        type: 'range',
+        label: 'Font size',
+        currentValue: (settings?.fontSize || 16) + 'px',
+        min: 12,
+        max: 24,
+        value: settings?.fontSize || 16,
+        onChange: (value) => {
+          if (settings?.onFontSizeChange) {
+            settings.onFontSizeChange(value);
+            // Update stored settings
+            if (this.settingsRef) this.settingsRef.fontSize = value;
+          }
+          return value + 'px';
+        }
+      },
+      {
+        type: 'range',
+        label: 'Sync offset',
+        currentValue: (settings?.syncDelay || 0) + 'ms',
+        min: -2000,
+        max: 2000,
+        value: settings?.syncDelay || 0,
+        step: 50,
+        onChange: (value) => {
+          if (settings?.onSyncDelayChange) {
+            settings.onSyncDelayChange(value);
+            // Update stored settings
+            if (this.settingsRef) this.settingsRef.syncDelay = value;
+          }
+          return value + 'ms';
+        }
+      },
+      { type: 'separator' },
+      {
+        type: 'submenu',
+        label: 'Background',
+        currentValue: this.getBackgroundLabel(settings?.backgroundMode || 'album'),
+        options: [
+          { value: 'album', label: 'Album art' },
+          { value: 'gradient', label: 'Gradient' },
+          { value: 'vinyl', label: 'Vinyl disc' },
+          { value: 'none', label: 'None' }
+        ],
+        selected: settings?.backgroundMode || 'album',
+        onChange: (value) => {
+          if (settings?.onBackgroundModeChange) settings.onBackgroundModeChange(value);
+        }
+      }
+    ];
+    
+    menuItems.forEach((item, idx) => {
+      if (item.type === 'separator') {
+        const separator = document.createElement('div');
+        separator.style.cssText = 'height: 1px; background: rgba(255, 255, 255, 0.1); margin: 4px 0;';
+        panel.appendChild(separator);
+        return;
+      }
+      
+      const menuItem = document.createElement('div');
+      menuItem.setAttribute('data-menu-item', 'true');
+      menuItem.style.cssText = `
+        padding: 8px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        transition: background 0.1s;
+        min-height: 40px;
+      `;
+      
+      menuItem.addEventListener('mouseenter', () => {
+        menuItem.style.background = 'rgba(255, 255, 255, 0.1)';
+      });
+      
+      menuItem.addEventListener('mouseleave', () => {
+        menuItem.style.background = 'transparent';
+      });
+      
+      const label = document.createElement('div');
+      label.textContent = item.label;
+      label.style.cssText = 'flex: 1; font-size: 13px;';
+      menuItem.appendChild(label);
+      
+      if (item.type === 'button') {
+        if (item.checked !== undefined) {
+          const checkmark = document.createElement('div');
+          checkmark.textContent = '✓';
+          checkmark.style.cssText = `font-size: 16px; opacity: ${item.checked ? '1' : '0'};`;
+          menuItem.appendChild(checkmark);
+          
+          menuItem.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (item.onClick) item.onClick();
+          });
+        } else {
+          menuItem.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (item.onClick) item.onClick();
+          });
+        }
+      } else if (item.type === 'range') {
+        menuItem.style.flexDirection = 'column';
+        menuItem.style.alignItems = 'stretch';
+        menuItem.style.cursor = 'default';
+        menuItem.style.padding = '12px 16px';
+        
+        const topRow = document.createElement('div');
+        topRow.style.cssText = 'display: flex; justify-content: space-between; margin-bottom: 8px;';
+        
+        const labelDiv = document.createElement('div');
+        labelDiv.textContent = item.label;
+        labelDiv.style.fontSize = '13px';
+        
+        const valueDiv = document.createElement('div');
+        valueDiv.textContent = item.currentValue;
+        valueDiv.style.cssText = 'font-size: 13px; opacity: 0.6;';
+        
+        topRow.appendChild(labelDiv);
+        topRow.appendChild(valueDiv);
+        
+        const sliderContainer = document.createElement('div');
+        sliderContainer.style.cssText = 'position: relative; height: 4px; background: rgba(255, 255, 255, 0.2); border-radius: 2px;';
+        
+        const sliderFill = document.createElement('div');
+        const percentage = ((item.value - item.min) / (item.max - item.min)) * 100;
+        sliderFill.style.cssText = `position: absolute; left: 0; top: 0; height: 100%; width: ${percentage}%; background: #f00; border-radius: 2px;`;
+        
+        const sliderThumb = document.createElement('div');
+        sliderThumb.style.cssText = `position: absolute; top: 50%; left: ${percentage}%; transform: translate(-50%, -50%); width: 12px; height: 12px; background: #f00; border-radius: 50%; cursor: pointer;`;
+        
+        sliderContainer.appendChild(sliderFill);
+        sliderContainer.appendChild(sliderThumb);
+        
+        let isDragging = false;
+        let currentValue = item.value;
+        
+        sliderThumb.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          isDragging = true;
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+          if (isDragging) {
+            const rect = sliderContainer.getBoundingClientRect();
+            let percentage = ((e.clientX - rect.left) / rect.width) * 100;
+            percentage = Math.max(0, Math.min(100, percentage));
+            
+            const value = Math.round(item.min + (percentage / 100) * (item.max - item.min));
+            const step = item.step || 1;
+            const steppedValue = Math.round(value / step) * step;
+            
+            const newPercentage = ((steppedValue - item.min) / (item.max - item.min)) * 100;
+            sliderFill.style.width = newPercentage + '%';
+            sliderThumb.style.left = newPercentage + '%';
+            
+            // Store current value and only update display text
+            currentValue = steppedValue;
+            const displayText = item.label.includes('Font') ? steppedValue + 'px' : steppedValue + 'ms';
+            valueDiv.textContent = displayText;
+          }
+        });
+        
+        document.addEventListener('mouseup', (e) => {
+          if (isDragging) {
+            isDragging = false;
+            // Apply the setting only on mouseup to prevent lag
+            if (item.onChange) {
+              const displayValue = item.onChange(currentValue);
+              valueDiv.textContent = displayValue;
+            }
+          }
+        });
+        
+        sliderContainer.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = sliderContainer.getBoundingClientRect();
+          let percentage = ((e.clientX - rect.left) / rect.width) * 100;
+          percentage = Math.max(0, Math.min(100, percentage));
+          
+          const value = Math.round(item.min + (percentage / 100) * (item.max - item.min));
+          const step = item.step || 1;
+          const steppedValue = Math.round(value / step) * step;
+          
+          const newPercentage = ((steppedValue - item.min) / (item.max - item.min)) * 100;
+          sliderFill.style.width = newPercentage + '%';
+          sliderThumb.style.left = newPercentage + '%';
+          
+          // Apply immediately on click
+          if (item.onChange) {
+            const displayValue = item.onChange(steppedValue);
+            valueDiv.textContent = displayValue;
+          }
+        });
+        
+        menuItem.replaceChildren(topRow, sliderContainer);
+      } else if (item.type === 'submenu') {
+        const valueDiv = document.createElement('div');
+        valueDiv.textContent = item.currentValue;
+        valueDiv.style.cssText = 'font-size: 13px; opacity: 0.6; display: flex; align-items: center; gap: 4px;';
+        
+        const arrow = document.createElement('span');
+        arrow.textContent = '›';
+        arrow.style.fontSize = '16px';
+        valueDiv.appendChild(arrow);
+        
+        menuItem.appendChild(valueDiv);
+        
+        menuItem.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // Create submenu
+          const submenu = this.createSubmenu(item.label, item.options, item.selected, (value) => {
+            valueDiv.textContent = this.getBackgroundLabel(value);
+            valueDiv.appendChild(arrow);
+            if (item.onChange) {
+              item.onChange(value);
+              // Update stored settings
+              if (this.settingsRef) this.settingsRef.backgroundMode = value;
+            }
+            submenu.remove();
+          });
+          panel.style.display = 'none';
+          container.appendChild(submenu);
+        });
+      }
+      
+      panel.appendChild(menuItem);
+    });
+    
+    return panel;
+  }
+
+  /**
+   * Create submenu for options
+   */
+  createSubmenu(title, options, selected, onChange) {
+    const submenu = document.createElement('div');
+    submenu.style.cssText = `
+      position: absolute;
+      bottom: 48px;
+      right: 0;
+      width: 272px;
+      background: rgba(28, 28, 28, 0.97);
+      border-radius: 2px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 2px 10px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      z-index: 10000;
+      font-family: Roboto, Arial, sans-serif;
+      font-size: 14px;
+      color: #eee;
+    `;
+    
+    // Back button
+    const backBtn = document.createElement('div');
+    backBtn.style.cssText = 'padding: 8px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid rgba(255, 255, 255, 0.1);';
+    
+    const backArrow = document.createElement('span');
+    backArrow.textContent = '‹';
+    backArrow.style.fontSize = '20px';
+    
+    const backLabel = document.createElement('span');
+    backLabel.textContent = title;
+    backLabel.style.fontSize = '13px';
+    
+    backBtn.appendChild(backArrow);
+    backBtn.appendChild(backLabel);
+    
+    backBtn.addEventListener('mouseenter', () => {
+      backBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+    });
+    
+    backBtn.addEventListener('mouseleave', () => {
+      backBtn.style.background = 'transparent';
+    });
+    
+    backBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      submenu.remove();
+      document.querySelector('#lyrics-settings-panel').style.display = 'block';
+    });
+    
+    submenu.appendChild(backBtn);
+    
+    // Options
+    options.forEach(option => {
+      const optionItem = document.createElement('div');
+      optionItem.style.cssText = `
+        padding: 8px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        transition: background 0.1s;
+        min-height: 40px;
+      `;
+      
+      const optionLabel = document.createElement('div');
+      optionLabel.textContent = option.label;
+      optionLabel.style.fontSize = '13px';
+      
+      const checkmark = document.createElement('div');
+      checkmark.textContent = '✓';
+      checkmark.style.cssText = `font-size: 16px; opacity: ${option.value === selected ? '1' : '0'};`;
+      
+      optionItem.appendChild(optionLabel);
+      optionItem.appendChild(checkmark);
+      
+      optionItem.addEventListener('mouseenter', () => {
+        optionItem.style.background = 'rgba(255, 255, 255, 0.1)';
+      });
+      
+      optionItem.addEventListener('mouseleave', () => {
+        optionItem.style.background = 'transparent';
+      });
+      
+      optionItem.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (onChange) onChange(option.value);
+      });
+      
+      submenu.appendChild(optionItem);
+    });
+    
+    return submenu;
+  }
+
+  /**
+   * Get background mode label
+   */
+  getBackgroundLabel(mode) {
+    const labels = {
+      'album': 'Album art',
+      'gradient': 'Gradient',
+      'vinyl': 'Vinyl disc',
+      'none': 'None'
+    };
+    return labels[mode] || 'Album art';
+  }
+
+  /**
+   * Update settings in the panel (for external changes)
+   */
+  updateSettingsDisplay(newSettings) {
+    if (this.settingsRef) {
+      Object.assign(this.settingsRef, newSettings);
+    }
   }
 
   /**

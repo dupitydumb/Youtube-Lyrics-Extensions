@@ -83,7 +83,7 @@
 
 #Lyric-Panel {
   position: relative !important;
-  z-index: 1 !important;
+  z-index: 2 !important;
 }
 
 /* ==================== HEADER ==================== */
