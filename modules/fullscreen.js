@@ -5,6 +5,7 @@
 export class FullscreenManager {
   constructor(backgroundManager) {
     this.backgroundManager = backgroundManager;
+    this.settings = null;
     this.overlay = null;
     this.lyricsContainer = null;
     this.isActive = false;
@@ -23,8 +24,11 @@ export class FullscreenManager {
   /**
    * Enter fullscreen mode
    */
-  enter(lyrics, currentIndex = -1, imageUrl = null) {
+  enter(lyrics, currentIndex = -1, imageUrl = null, settings = null) {
     if (this.isActive) return;
+    
+    // Store settings for this fullscreen session
+    this.settings = settings;
     
     // Create fullscreen overlay
     this.overlay = this.createOverlay();
@@ -257,29 +261,74 @@ export class FullscreenManager {
     
     lyrics.forEach((lyric, index) => {
       const lyricLine = document.createElement('div');
-      lyricLine.className = 'lyric-line future';
+      lyricLine.className = 'fullscreen-lyric-line future';
       lyricLine.dataset.index = index;
       lyricLine.dataset.time = lyric.time;
       
       // Check if lyric has word-level timing
       if (lyric.words && lyric.words.length > 0) {
         // Create word-by-word display
+        const wordsContainer = document.createElement('div');
         lyric.words.forEach((wordData, wordIndex) => {
           const wordSpan = document.createElement('span');
           wordSpan.className = 'lyric-word future';
           wordSpan.textContent = wordData.word;
           wordSpan.dataset.wordIndex = wordIndex;
           wordSpan.dataset.wordTime = wordData.time;
-          lyricLine.appendChild(wordSpan);
+          wordsContainer.appendChild(wordSpan);
           
           // Add space after word (except last word)
           if (wordIndex < lyric.words.length - 1) {
-            lyricLine.appendChild(document.createTextNode(' '));
+            wordsContainer.appendChild(document.createTextNode(' '));
           }
         });
+        lyricLine.appendChild(wordsContainer);
+        
+        // Add romanization if enabled (for word-level timing)
+        if (this.settings?.showRomanization && lyric.romanized) {
+          const romanDiv = document.createElement('div');
+          romanDiv.className = 'fullscreen-romanization';
+          romanDiv.textContent = lyric.romanized;
+          Object.assign(romanDiv.style, {
+            marginTop: '8px',
+            fontSize: '0.75em',
+            opacity: '0.9',
+            fontStyle: 'italic',
+            color: 'inherit'
+          });
+          lyricLine.appendChild(romanDiv);
+        }
       } else {
         // Regular line-by-line display
-        lyricLine.textContent = lyric.text;
+        const shouldHideOriginal = lyric.romanized && 
+                                   this.settings?.showRomanization && 
+                                   this.settings?.hideOriginalLyrics;
+        
+        if (!shouldHideOriginal) {
+          const textDiv = document.createElement('div');
+          textDiv.textContent = lyric.text;
+          lyricLine.appendChild(textDiv);
+        }
+        
+        // Add romanization if enabled
+        if (this.settings?.showRomanization && lyric.romanized) {
+          const romanDiv = document.createElement('div');
+          romanDiv.className = 'fullscreen-romanization';
+          romanDiv.textContent = lyric.romanized;
+          Object.assign(romanDiv.style, {
+            marginTop: '8px',
+            fontSize: shouldHideOriginal ? '1em' : '0.75em',
+            opacity: shouldHideOriginal ? '1' : '0.9',
+            fontStyle: 'italic',
+            color: 'inherit'
+          });
+          lyricLine.appendChild(romanDiv);
+        }
+        
+        // If only showing romanization, set it as text content
+        if (shouldHideOriginal && !lyric.romanized) {
+          lyricLine.textContent = lyric.text;
+        }
       }
 
       Object.assign(lyricLine.style, {
@@ -287,11 +336,12 @@ export class FullscreenManager {
         fontSize: '32px',
         lineHeight: '1.8',
         color: 'rgba(255, 255, 255, 0.5)',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        transform: 'scale(1)',
+        transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease',
+        transform: 'translateZ(0)',
         fontWeight: '400',
         textAlign: 'center',
-        cursor: 'pointer'
+        cursor: 'pointer',
+        willChange: 'font-size, color'
       });
 
       // Click to seek
@@ -314,7 +364,7 @@ export class FullscreenManager {
   updateCurrentLyric(currentIndex, currentTime) {
     if (!this.lyricsContainer) return;
 
-    const lyricLines = this.lyricsContainer.querySelectorAll('.lyric-line');
+    const lyricLines = this.lyricsContainer.querySelectorAll('.fullscreen-lyric-line');
 
     lyricLines.forEach((line, index) => {
       const isPast = index < currentIndex;
@@ -323,13 +373,20 @@ export class FullscreenManager {
       if (isCurrent) {
         line.classList.add('current');
         line.classList.remove('past', 'future');
-        Object.assign(line.style, {
-          color: '#ffffff',
-          fontSize: '48px',
-          fontWeight: '700',
-          transform: 'scale(1.1)',
-          textShadow: '0 0 20px rgba(255, 255, 255, 0.5), 0 2px 12px rgba(255, 255, 255, 0.3)'
-        });
+        line.style.cssText = `
+          color: #ffffff !important;
+          font-size: 48px !important;
+          font-weight: 700 !important;
+          transform: translateZ(0) !important;
+          text-shadow: 0 0 20px rgba(255, 255, 255, 0.5), 0 2px 12px rgba(255, 255, 255, 0.3) !important;
+          padding: 20px 30px !important;
+          line-height: 1.8 !important;
+          text-align: center !important;
+          cursor: pointer !important;
+          transition: font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, text-shadow 0.3s ease !important;
+          opacity: 1 !important;
+          will-change: font-size, color !important;
+        `;
 
         // Update word-by-word highlighting if available and in word mode
         if (currentTime !== null && this.highlightMode === 'word') {
@@ -389,9 +446,11 @@ export class FullscreenManager {
         Object.assign(line.style, {
           fontSize: '32px',
           fontWeight: '400',
-          transform: 'scale(1)',
+          transform: 'translateZ(0)',
           textShadow: 'none',
-          color: isPast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.5)'
+          color: isPast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.5)',
+          transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease',
+          willChange: 'font-size, color'
         });
       }
     });
