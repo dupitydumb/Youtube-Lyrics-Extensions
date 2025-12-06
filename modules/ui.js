@@ -273,8 +273,18 @@ export class LyricsUI {
       lyricLine.dataset.index = index;
       lyricLine.dataset.time = lyric.time;
       
+      // Check if we should hide original lyrics when showing romanization
+      const shouldHideOriginal = lyric.romanized && 
+                                 this.settingsRef?.showRomanization && 
+                                 this.settingsRef?.hideOriginalLyrics;
+      
       // Create a container for the main lyric text
       const textContainer = document.createElement('div');
+      
+      // If showing romanization and hideOriginalLyrics is enabled, hide the original text
+      if (shouldHideOriginal) {
+        textContainer.style.display = 'none';
+      }
       
       // Check if lyric has word-level timing
       if (lyric.words && lyric.words.length > 0) {
@@ -299,15 +309,15 @@ export class LyricsUI {
       
       lyricLine.appendChild(textContainer);
 
-      // Optional romanization displayed beneath
+      // Optional romanization displayed beneath (or as main text if original is hidden)
       if (this.settingsRef && this.settingsRef.showRomanization && lyric.romanized) {
         const roman = document.createElement('div');
         roman.className = 'romanization-text';
         roman.textContent = lyric.romanized;
         Object.assign(roman.style, {
           marginTop: '6px',
-          fontSize: '0.85em',
-          color: 'rgba(255,255,255,0.5)',
+          fontSize: shouldHideOriginal ? '1em' : '0.85em',
+          color: 'inherit',
           fontStyle: 'italic'
         });
         lyricLine.appendChild(roman);
@@ -1026,6 +1036,20 @@ export class LyricsUI {
       },
       {
         type: 'submenu',
+        label: 'Hide original lyrics',
+        currentValue: (settings?.hideOriginalLyrics ? 'On' : 'Off'),
+        options: [
+          { value: true, label: 'On' },
+          { value: false, label: 'Off' }
+        ],
+        selected: settings?.hideOriginalLyrics === true,
+        onChange: (value) => {
+          if (this.settingsRef) this.settingsRef.hideOriginalLyrics = (value === true);
+          if (settings?.onHideOriginalLyricsChange) settings.onHideOriginalLyricsChange(value === true);
+        }
+      },
+      {
+        type: 'submenu',
         label: 'Highlight mode',
         currentValue: this.getHighlightLabel(settings?.highlightMode || 'line'),
         options: [
@@ -1230,6 +1254,8 @@ export class LyricsUI {
               valueDiv.textContent = this.getGradientThemeLabel(value);
             } else if (item.label === 'Romanization') {
               valueDiv.textContent = (value === true) ? 'On' : 'Off';
+            } else if (item.label === 'Hide original lyrics') {
+              valueDiv.textContent = (value === true) ? 'On' : 'Off';
             } else {
               valueDiv.textContent = value;
             }
@@ -1246,6 +1272,8 @@ export class LyricsUI {
                   this.settingsRef.gradientTheme = value;
                 } else if (item.label === 'Romanization') {
                   this.settingsRef.showRomanization = (value === true);
+                } else if (item.label === 'Hide original lyrics') {
+                  this.settingsRef.hideOriginalLyrics = (value === true);
                 }
               }
             }
@@ -1333,7 +1361,9 @@ export class LyricsUI {
       
       const checkmark = document.createElement('div');
       checkmark.textContent = '✓';
-      checkmark.style.cssText = `font-size: 16px; opacity: ${option.value === selected ? '1' : '0'};`;
+      // Use loose equality to handle boolean/string comparisons correctly
+      const isSelected = (option.value == selected) || (option.value === selected);
+      checkmark.style.cssText = `font-size: 16px; opacity: ${isSelected ? '1' : '0'};`;
       
       optionItem.appendChild(optionLabel);
       optionItem.appendChild(checkmark);
@@ -1353,7 +1383,9 @@ export class LyricsUI {
         allCheckmarks.forEach((item, idx) => {
           const check = item.querySelector('div:last-child');
           if (check) {
-            check.style.opacity = options[idx].value === option.value ? '1' : '0';
+            // Use loose equality to handle boolean/string comparisons correctly
+            const isMatch = (options[idx].value == option.value) || (options[idx].value === option.value);
+            check.style.opacity = isMatch ? '1' : '0';
           }
         });
         if (onChange) onChange(option.value);

@@ -12,7 +12,8 @@ export class SettingsManager {
       gradientTheme: 'random',
       customColors: [],
       highlightMode: 'line', // 'line' or 'word'
-      showRomanization: false // Show romanization for Korean/Japanese lyrics
+      showRomanization: false, // Show romanization for Korean/Japanese lyrics
+      hideOriginalLyrics: true // Hide original lyrics when romanization is shown
     };
     
     this.settings = { ...this.defaults };

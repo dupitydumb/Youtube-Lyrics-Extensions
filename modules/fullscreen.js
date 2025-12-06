@@ -81,10 +81,8 @@ export class FullscreenManager {
     if (lyrics && Array.isArray(lyrics)) {
       this.displayLyricsInFullscreen(lyrics);
       if (currentIndex >= 0) {
-        // Scroll immediately to current lyric without delay
-        setTimeout(() => {
-          this.updateCurrentLyric(currentIndex);
-        }, 100);
+        // Highlight current lyric immediately without delay
+        this.updateCurrentLyric(currentIndex);
       }
     }
     
@@ -310,9 +308,9 @@ export class FullscreenManager {
         Object.assign(line.style, {
           color: '#ffffff',
           fontSize: '48px',
-          fontWeight: '700',
+          fontWeight: '600',
           transform: 'scale(1.1)',
-          textShadow: '0 0 30px rgba(255, 255, 255, 0.5)'
+          textShadow: '0 2px 12px rgba(255, 255, 255, 0.3)'
         });
 
         // Update word-by-word highlighting if available and in word mode
@@ -326,9 +324,9 @@ export class FullscreenManager {
               
               if (timeDiff >= 0 && timeDiff < 0.3) {
                 word.style.color = '#ffffff';
-                word.style.textShadow = '0 0 20px rgba(255, 255, 255, 0.5)';
+                word.style.textShadow = '0 2px 12px rgba(255, 255, 255, 0.3)';
                 word.style.transform = 'scale(1.05)';
-                word.style.fontWeight = '700';
+                word.style.fontWeight = '600';
               } else if (timeDiff >= 0.3) {
                 word.style.color = 'rgba(255, 255, 255, 0.5)';
                 word.style.textShadow = 'none';
