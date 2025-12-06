@@ -38,21 +38,29 @@ export class FullscreenManager {
       width: 80%;
       max-width: 900px;
       height: 80%;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      overflow-y: auto;
+      overflow-y: scroll;
+      overflow-x: hidden;
       padding: 40px;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
+      box-sizing: border-box;
     `;
     
     // Hide scrollbar for webkit browsers
     const style = document.createElement('style');
     style.textContent = `
       #fullscreen-lyrics-container::-webkit-scrollbar {
-        display: none;
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+      #fullscreen-lyrics-container {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+      }
+      #fullscreen-lyrics-wrapper {
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
       }
     `;
     this.overlay.appendChild(style);
@@ -81,8 +89,12 @@ export class FullscreenManager {
     if (lyrics && Array.isArray(lyrics)) {
       this.displayLyricsInFullscreen(lyrics);
       if (currentIndex >= 0) {
-        // Highlight current lyric immediately without delay
-        this.updateCurrentLyric(currentIndex);
+        // Wait for layout to settle before highlighting and scrolling
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            this.updateCurrentLyric(currentIndex);
+          });
+        });
       }
     }
     
@@ -239,6 +251,10 @@ export class FullscreenManager {
     
     this.lyricsContainer.replaceChildren();
     
+    // Create wrapper for proper centering and scrolling
+    const wrapper = document.createElement('div');
+    wrapper.id = 'fullscreen-lyrics-wrapper';
+    
     lyrics.forEach((lyric, index) => {
       const lyricLine = document.createElement('div');
       lyricLine.className = 'lyric-line future';
@@ -270,7 +286,7 @@ export class FullscreenManager {
         padding: '20px 30px',
         fontSize: '32px',
         lineHeight: '1.8',
-        color: 'rgba(255, 255, 255, 0.4)',
+        color: 'rgba(255, 255, 255, 0.5)',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         transform: 'scale(1)',
         fontWeight: '400',
@@ -286,8 +302,10 @@ export class FullscreenManager {
         }
       });
 
-      this.lyricsContainer.appendChild(lyricLine);
+      wrapper.appendChild(lyricLine);
     });
+    
+    this.lyricsContainer.appendChild(wrapper);
   }
 
   /**
@@ -308,9 +326,9 @@ export class FullscreenManager {
         Object.assign(line.style, {
           color: '#ffffff',
           fontSize: '48px',
-          fontWeight: '600',
+          fontWeight: '700',
           transform: 'scale(1.1)',
-          textShadow: '0 2px 12px rgba(255, 255, 255, 0.3)'
+          textShadow: '0 0 20px rgba(255, 255, 255, 0.5), 0 2px 12px rgba(255, 255, 255, 0.3)'
         });
 
         // Update word-by-word highlighting if available and in word mode
@@ -342,16 +360,23 @@ export class FullscreenManager {
           });
         }
 
-        // Smooth scroll to current lyric
-        const containerHeight = this.lyricsContainer.clientHeight;
-        const lineTop = line.offsetTop;
-        const lineHeight = line.offsetHeight;
-        const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
-        
-        this.lyricsContainer.scrollTo({
-          top: scrollPosition,
-          behavior: 'smooth'
-        });
+        // Smooth scroll to current lyric - center it in the viewport
+        setTimeout(() => {
+          const containerRect = this.lyricsContainer.getBoundingClientRect();
+          const lineRect = line.getBoundingClientRect();
+          const containerScrollTop = this.lyricsContainer.scrollTop;
+          
+          // Calculate position to center the line
+          const lineRelativeTop = lineRect.top - containerRect.top + containerScrollTop;
+          const containerHeight = this.lyricsContainer.clientHeight;
+          const lineHeight = line.offsetHeight;
+          const scrollPosition = lineRelativeTop - (containerHeight / 2) + (lineHeight / 2);
+          
+          this.lyricsContainer.scrollTo({
+            top: scrollPosition,
+            behavior: 'smooth'
+          });
+        }, 50);
       } else {
         line.classList.remove('current');
         if (isPast) {
@@ -366,7 +391,7 @@ export class FullscreenManager {
           fontWeight: '400',
           transform: 'scale(1)',
           textShadow: 'none',
-          color: isPast ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.4)'
+          color: isPast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.5)'
         });
       }
     });
