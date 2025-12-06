@@ -106,6 +106,24 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Background mode buttons
+  bgModeButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.mode;
+      
+      bgModeButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+  // Sync offset slider listener
+  syncOffsetSlider.addEventListener("input", (e) => {
+    const syncDelay = parseInt(e.target.value);
+    syncOffsetValue.textContent = syncDelay + "ms";
+    
+    chrome.storage.sync.set({ syncDelay }, () => {
+      sendMessageToTabs({ type: "updateSyncDelay", syncDelay });
+    });
+  });
+
   // Background mode select
   backgroundModeSelect.addEventListener("change", (e) => {
     const mode = e.target.value;
@@ -120,37 +138,13 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.sync.set({ backgroundMode: mode }, () => {
       sendMessageToTabs({ type: "updateBackgroundMode", backgroundMode: mode });
     });
-  });
-
-  // Gradient theme select
-  gradientThemeSelect.addEventListener("change", (e) => {
-    const theme = e.target.value;
-    
-    // Show/hide custom colors section
-    if (theme === 'custom') {
-      customColorsSection.style.display = 'block';
-    } else {
-      customColorsSection.style.display = 'none';
-    }
-    
-    chrome.storage.sync.set({ gradientTheme: theme }, () => {
-      sendMessageToTabs({ type: "updateGradientTheme", gradientTheme: theme });
-    });
-  });
-
-  // Custom color inputs
+  });Custom color inputs
   const updateCustomColors = () => {
     const customColors = [
-      customColor1.value,
-      customColor2.value,
-      customColor3.value,
-      customColor4.value
-    ];
-    
-    chrome.storage.sync.set({ customColors }, () => {
-      sendMessageToTabs({ type: "updateCustomColors", customColors });
-    });
-  };
+  customColor1.addEventListener("change", updateCustomColors);
+  customColor2.addEventListener("change", updateCustomColors);
+  customColor3.addEventListener("change", updateCustomColors);
+  customColor4.addEventListener("change", updateCustomColors);
 
   customColor1.addEventListener("change", updateCustomColors);
   customColor2.addEventListener("change", updateCustomColors);
@@ -172,6 +166,26 @@ document.addEventListener("DOMContentLoaded", () => {
     
     chrome.storage.sync.set({ highlightMode: mode }, () => {
       sendMessageToTabs({ type: "updateHighlightMode", highlightMode: mode });
+    });
+  }););
+  };
+
+  customColor1.addEventListener("change", updateCustomColors);
+  customColor2.addEventListener("change", updateCustomColors);
+  customColor3.addEventListener("change", updateCustomColors);
+  customColor4.addEventListener("change", updateCustomColors);
+
+  // Playback mode buttons
+  playbackModeButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.mode;
+      
+      playbackModeButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      chrome.storage.sync.set({ playbackMode: mode }, () => {
+        sendMessageToTabs({ type: "updatePlaybackMode", playbackMode: mode });
+      });
     });
   });
 

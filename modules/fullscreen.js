@@ -69,6 +69,14 @@ export class FullscreenManager {
     this.overlay.appendChild(bgContainer);
     this.overlay.appendChild(this.lyricsContainer);
     
+    // Display lyrics in fullscreen container
+    if (lyrics && Array.isArray(lyrics)) {
+      this.displayLyricsInFullscreen(lyrics);
+      if (currentIndex >= 0) {
+        this.updateCurrentLyric(currentIndex);
+      }
+    }
+    
     // Add to DOM
     document.body.appendChild(this.overlay);
     
@@ -212,5 +220,99 @@ export class FullscreenManager {
     if (bgContainer && this.backgroundManager) {
       this.backgroundManager.updateFullscreenBackground(bgContainer, imageUrl);
     }
+  }
+
+  /**
+   * Display lyrics in fullscreen container
+   */
+  displayLyricsInFullscreen(lyrics) {
+    if (!this.lyricsContainer) return;
+    
+    this.lyricsContainer.replaceChildren();
+    
+    lyrics.forEach((lyric, index) => {
+      const lyricLine = document.createElement('div');
+      lyricLine.className = 'lyric-line future';
+      lyricLine.dataset.index = index;
+      lyricLine.dataset.time = lyric.time;
+      lyricLine.textContent = lyric.text;
+
+      Object.assign(lyricLine.style, {
+        padding: '20px 30px',
+        fontSize: '32px',
+        lineHeight: '1.8',
+        color: 'rgba(255, 255, 255, 0.4)',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: 'scale(1)',
+        fontWeight: '400',
+        textAlign: 'center',
+        cursor: 'pointer'
+      });
+
+      // Click to seek
+      lyricLine.addEventListener('click', () => {
+        const videoElement = document.querySelector('video');
+        if (videoElement) {
+          videoElement.currentTime = lyric.time;
+        }
+      });
+
+      this.lyricsContainer.appendChild(lyricLine);
+    });
+  }
+
+  /**
+   * Update current lyric highlight in fullscreen
+   */
+  updateCurrentLyric(currentIndex) {
+    if (!this.lyricsContainer) return;
+
+    const lyricLines = this.lyricsContainer.querySelectorAll('.lyric-line');
+
+    lyricLines.forEach((line, index) => {
+      const isPast = index < currentIndex;
+      const isCurrent = index === currentIndex;
+
+      if (isCurrent) {
+        line.classList.add('current');
+        line.classList.remove('past', 'future');
+        Object.assign(line.style, {
+          color: '#ffffff',
+          fontSize: '48px',
+          fontWeight: '700',
+          transform: 'scale(1.1)',
+          textShadow: '0 0 30px rgba(255, 255, 255, 0.5)'
+        });
+
+        // Smooth scroll to current lyric
+        setTimeout(() => {
+          const containerHeight = this.lyricsContainer.clientHeight;
+          const lineTop = line.offsetTop;
+          const lineHeight = line.offsetHeight;
+          const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
+          
+          this.lyricsContainer.scrollTo({
+            top: scrollPosition,
+            behavior: 'smooth'
+          });
+        }, 50);
+      } else {
+        line.classList.remove('current');
+        if (isPast) {
+          line.classList.add('past');
+          line.classList.remove('future');
+        } else {
+          line.classList.add('future');
+          line.classList.remove('past');
+        }
+        Object.assign(line.style, {
+          fontSize: '32px',
+          fontWeight: '400',
+          transform: 'scale(1)',
+          textShadow: 'none',
+          color: isPast ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.4)'
+        });
+      }
+    });
   }
 }

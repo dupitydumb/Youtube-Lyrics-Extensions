@@ -13,6 +13,7 @@ export class YouTubeIntegration {
     };
     
     this.currentUrl = '';
+    this.currentVideoId = '';
     this.currentTitle = '';
     this.titleObserver = null;
     this.urlCheckInterval = null;
@@ -164,15 +165,19 @@ export class YouTubeIntegration {
 
     const handleUrlChange = debounce(() => {
       const currentUrl = window.location.href;
+      const currentVideoId = this.getVideoId();
       
       if (this.isVideoPage()) {
-        if (currentUrl !== this.currentUrl) {
+        // Check both URL and video ID to catch all navigation types
+        if (currentUrl !== this.currentUrl || currentVideoId !== this.currentVideoId) {
           this.currentUrl = currentUrl;
-          console.log('URL changed to video page');
+          this.currentVideoId = currentVideoId;
+          console.log('Video changed - URL:', currentUrl, 'VideoID:', currentVideoId);
           this.triggerNavigate();
         }
       } else if (this.currentUrl.includes('/watch')) {
         this.currentUrl = currentUrl;
+        this.currentVideoId = '';
         this.triggerNavigate(true); // Navigate away
       }
     }, 250);
@@ -208,6 +213,7 @@ export class YouTubeIntegration {
 
     // Initial check
     this.currentUrl = window.location.href;
+    this.currentVideoId = this.getVideoId();
     if (this.isVideoPage()) {
       setTimeout(() => this.triggerNavigate(), 500);
     }

@@ -10,7 +10,8 @@ export class SettingsManager {
       syncDelay: 0,
       backgroundMode: 'album',
       gradientTheme: 'random',
-      customColors: []
+      customColors: [],
+      highlightMode: 'line' // 'line' or 'word'
     };
     
     this.settings = { ...this.defaults };
