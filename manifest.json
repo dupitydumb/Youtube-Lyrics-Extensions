@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Youtube Lyrics",
-  "version": "2.0.1",
+  "version": "2.0.3",
   "description": "A Chrome extension that displays synchronized lyrics for YouTube videos with a beautiful, modern interface.",
   "permissions": ["activeTab", "storage"],
   "host_permissions": ["https://lrclib.net/*"],
