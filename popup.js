@@ -15,19 +15,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const customColor4 = document.getElementById("custom-color-4");
   const playbackModeSelect = document.getElementById("playback-mode-select");
   const highlightModeSelect = document.getElementById("highlight-mode-select");
+  const romanizationSwitch = document.getElementById("romanization-switch");
 
   // Load saved settings
   chrome.storage.sync.get([
-    "isEnabled", 
+    "enabled", 
     "fontSize", 
     "backgroundMode", 
     "gradientTheme", 
     "playbackMode", 
     "syncDelay",
     "customColors",
-    "highlightMode"
+    "highlightMode",
+    "showRomanization"
   ], (data) => {
-    const isEnabled = data.isEnabled === true;
+    const isEnabled = data.enabled !== false;
     const fontSize = data.fontSize || 16;
     const backgroundMode = data.backgroundMode || 'album';
     const gradientTheme = data.gradientTheme || 'random';
@@ -35,6 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const syncDelay = data.syncDelay || 0;
     const customColors = data.customColors || ['#667eea', '#764ba2', '#f093fb', '#4facfe'];
     const highlightMode = data.highlightMode || 'line';
+    const showRomanization = data.showRomanization === true;
     
     toggleSwitch.checked = isEnabled;
     updateStatus(isEnabled);
@@ -71,13 +74,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Set highlight mode
     highlightModeSelect.value = highlightMode;
+
+    // Set romanization
+    if (romanizationSwitch) {
+      romanizationSwitch.checked = showRomanization;
+    }
   });
 
   // Toggle switch listener
   toggleSwitch.addEventListener("change", () => {
     const isEnabled = toggleSwitch.checked;
     
-    chrome.storage.sync.set({ isEnabled }, () => {
+    chrome.storage.sync.set({ enabled: isEnabled }, () => {
       updateStatus(isEnabled);
       chrome.action.setBadgeText({ text: isEnabled ? "ON" : "" });
       chrome.tabs.query({ url: "*://*.youtube.com/*" }, (tabs) => {
@@ -174,6 +182,16 @@ document.addEventListener("DOMContentLoaded", () => {
       sendMessageToTabs({ type: "updateHighlightMode", highlightMode: mode });
     });
   });
+
+  // Romanization toggle
+  if (romanizationSwitch) {
+    romanizationSwitch.addEventListener("change", () => {
+      const enabled = romanizationSwitch.checked;
+      chrome.storage.sync.set({ showRomanization: enabled }, () => {
+        sendMessageToTabs({ type: "updateRomanization", showRomanization: enabled });
+      });
+    });
+  }
 
   function updateStatus(isEnabled) {
     status.textContent = isEnabled ? "ON" : "OFF";

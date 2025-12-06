@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Romanization Test</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #1a1a1a; color: #fff; }
+    .test-case { margin: 20px 0; padding: 15px; background: #2a2a2a; border-radius: 8px; }
+    .original { font-size: 18px; margin-bottom: 8px; }
+    .romanized { font-size: 14px; color: #aaa; font-style: italic; }
+    h2 { color: #667eea; }
+  </style>
+</head>
+<body>
+  <h1>Romanization Test</h1>
+  
+  <h2>Korean Tests</h2>
+  <div id="korean-tests"></div>
+  
+  <h2>Japanese Tests</h2>
+  <div id="japanese-tests"></div>
+
+  <script type="module">
+    import { Romanizer } from './modules/romanization.js';
+    
+    const koreanTests = [
+      '안녕하세요',
+      '사랑해요',
+      '감사합니다',
+      '한국어'
+    ];
+    
+    const japaneseTests = [
+      'こんにちは',
+      'ありがとう',
+      'さようなら',
+      'カタカナ'
+    ];
+    
+    function displayTest(text, container) {
+      const div = document.createElement('div');
+      div.className = 'test-case';
+      
+      const original = document.createElement('div');
+      original.className = 'original';
+      original.textContent = `Original: ${text}`;
+      
+      const romanized = document.createElement('div');
+      romanized.className = 'romanized';
+      const result = Romanizer.romanize(text);
+      romanized.textContent = `Romanized: ${result}`;
+      
+      const lang = document.createElement('div');
+      lang.style.fontSize = '12px';
+      lang.style.color = '#888';
+      lang.textContent = `Detected: ${Romanizer.detectLanguage(text)}`;
+      
+      div.appendChild(original);
+      div.appendChild(romanized);
+      div.appendChild(lang);
+      container.appendChild(div);
+    }
+    
+    const koreanContainer = document.getElementById('korean-tests');
+    koreanTests.forEach(test => displayTest(test, koreanContainer));
+    
+    const japaneseContainer = document.getElementById('japanese-tests');
+    japaneseTests.forEach(test => displayTest(test, japaneseContainer));
+  </script>
+</body>
+</html>

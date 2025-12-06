@@ -43,7 +43,8 @@
         "modules/background.js",
         "modules/youtube.js",
         "modules/fullscreen.js",
-        "modules/main.js"
+        "modules/main.js",
+        "modules/romanization.js"
       ],
       "matches": ["*://*.youtube.com/*"]
     }

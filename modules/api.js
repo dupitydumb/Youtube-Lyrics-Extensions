@@ -1,8 +1,141 @@
-import { API, ERROR_MESSAGES, CACHE_CONFIG } from './constants.js';
+import { API, ERROR_MESSAGES, CACHE_CONFIG, FILTER_WORDS } from './constants.js';
 
 /**
  * API Module - Handles all API interactions with retry logic and caching
  */
+
+/**
+ * Title Parser - Intelligent parsing of YouTube video titles
+ */
+export class TitleParser {
+  /**
+   * Parse YouTube title to extract song and artist
+   * Handles formats like:
+   * - "Song - Artist"
+   * - "Artist - Song"
+   * - "Song" (with channel as artist)
+   * - "Song (feat. Artist)"
+   */
+  static parseTitle(title, channelName = '') {
+    if (!title) return { song: '', artist: channelName, confidence: 0 };
+
+    const originalTitle = title;
+    title = title.trim();
+
+    // Remove common video markers
+    title = this.removeVideoMarkers(title);
+
+    // Strategy 1: Check for " - " separator (most common)
+    if (title.includes(' - ')) {
+      const parts = title.split(' - ').map(p => p.trim());
+      
+      if (parts.length === 2) {
+        // Determine which is song vs artist
+        const [part1, part2] = parts;
+        
+        // If channel name matches one part, that's likely the artist
+        if (channelName && this.similarity(part1, channelName) > 0.7) {
+          return { song: part2, artist: part1, confidence: 0.9 };
+        }
+        if (channelName && this.similarity(part2, channelName) > 0.7) {
+          return { song: part1, artist: part2, confidence: 0.9 };
+        }
+        
+        // If first part is likely artist name (shorter, capitalized)
+        if (part1.length < part2.length * 0.7 && this.isLikelyArtistName(part1)) {
+          return { song: part2, artist: part1, confidence: 0.8 };
+        }
+        
+        // Default: assume "Song - Artist" format
+        return { song: part1, artist: part2, confidence: 0.75 };
+      }
+    }
+
+    // Strategy 2: Check for parentheses with featuring
+    const featMatch = title.match(/(.+?)\s*\((?:feat\.|featuring|ft\.)\s*(.+?)\)/i);
+    if (featMatch) {
+      return { song: featMatch[1].trim(), artist: channelName || featMatch[2].trim(), confidence: 0.7 };
+    }
+
+    // Strategy 3: Check for pipe separator
+    if (title.includes(' | ')) {
+      const parts = title.split(' | ').map(p => p.trim());
+      return { song: parts[0], artist: channelName || parts[1] || '', confidence: 0.6 };
+    }
+
+    // Strategy 4: Just song name, use channel as artist
+    return { song: title, artist: channelName, confidence: channelName ? 0.8 : 0.4 };
+  }
+
+  /**
+   * Remove video markers from title
+   */
+  static removeVideoMarkers(title) {
+    // Remove brackets and parentheses with common terms
+    const patterns = [
+      /\[.*?(?:official|lyric|lyrics|video|audio|mv|music|visualizer|hd|4k).*?\]/gi,
+      /\(.*?(?:official|lyric|lyrics|video|audio|mv|music|visualizer|hd|4k).*?\)/gi
+    ];
+
+    for (const pattern of patterns) {
+      title = title.replace(pattern, '');
+    }
+
+    return title.trim();
+  }
+
+  /**
+   * Check if string is likely an artist name
+   */
+  static isLikelyArtistName(str) {
+    // Artist names are usually:
+    // - Capitalized
+    // - Shorter (1-3 words)
+    // - Don't contain common song words
+    const words = str.split(/\s+/);
+    if (words.length > 4) return false;
+    
+    const songWords = ['the', 'a', 'an', 'my', 'your', 'our', 'their', 'in', 'on', 'at', 'to', 'for'];
+    const hasSongWords = words.some(w => songWords.includes(w.toLowerCase()));
+    
+    return !hasSongWords;
+  }
+
+  /**
+   * Calculate string similarity (0-1)
+   */
+  static similarity(str1, str2) {
+    if (!str1 || !str2) return 0;
+    
+    str1 = str1.toLowerCase().trim();
+    str2 = str2.toLowerCase().trim();
+    
+    if (str1 === str2) return 1;
+    
+    // Simple character overlap ratio
+    const set1 = new Set(str1.split(''));
+    const set2 = new Set(str2.split(''));
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const union = new Set([...set1, ...set2]);
+    
+    return intersection.size / union.size;
+  }
+
+  /**
+   * Format title for search (remove filter words)
+   */
+  static formatForSearch(title) {
+    if (!title) return '';
+    
+    const notAllowed = new Set([...FILTER_WORDS.BASIC.map(w => w.toLowerCase())]);
+    
+    let formatted = title.toLowerCase().split(/\s+/)
+      .filter(word => !notAllowed.has(word) && !/[\uAC00-\uD7AF]/.test(word))
+      .join(' ');
+    
+    return formatted.trim();
+  }
+}
 
 export class LyricsAPI {
   constructor() {
@@ -138,34 +271,56 @@ export class LyricsAPI {
   }
 
   /**
-   * Find best matching lyrics from results
+   * Find best matching lyrics from results with fuzzy matching
    */
-  findBestMatch(results, artistName = '') {
+  findBestMatch(results, artistName = '', songName = '') {
     if (!results || results.length === 0) {
       return null;
     }
 
-    if (!artistName) {
+    if (!artistName && !songName) {
       return results[0];
     }
 
-    // Try to find exact artist match
-    const exactMatch = results.find(result => 
-      result.artistName && 
-      result.artistName.toLowerCase() === artistName.toLowerCase()
-    );
+    // Score each result
+    const scoredResults = results.map(result => {
+      let score = 0;
+      
+      // Artist matching (weighted 60%)
+      if (artistName && result.artistName) {
+        const artistSimilarity = TitleParser.similarity(artistName, result.artistName);
+        score += artistSimilarity * 0.6;
+        
+        // Bonus for exact match
+        if (artistName.toLowerCase() === result.artistName.toLowerCase()) {
+          score += 0.2;
+        }
+      }
+      
+      // Song name matching (weighted 40%)
+      if (songName && result.trackName) {
+        const songSimilarity = TitleParser.similarity(songName, result.trackName);
+        score += songSimilarity * 0.4;
+      }
+      
+      // Bonus for having synced lyrics
+      if (result.syncedLyrics) {
+        score += 0.1;
+      }
+      
+      return { result, score };
+    });
 
-    if (exactMatch) {
-      return exactMatch;
+    // Sort by score (highest first)
+    scoredResults.sort((a, b) => b.score - a.score);
+
+    // Return best match if confidence is reasonable
+    if (scoredResults[0].score > 0.3) {
+      return scoredResults[0].result;
     }
 
-    // Try partial match
-    const partialMatch = results.find(result => 
-      result.artistName && 
-      result.artistName.toLowerCase().includes(artistName.toLowerCase())
-    );
-
-    return partialMatch || results[0];
+    // Low confidence, return first result
+    return results[0];
   }
 
   /**
