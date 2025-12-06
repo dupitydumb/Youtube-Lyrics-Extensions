@@ -4,7 +4,7 @@ import { API, ERROR_MESSAGES, CACHE_CONFIG } from './constants.js';
  * API Module - Handles all API interactions with retry logic and caching
  */
 
-class LyricsAPI {
+export class LyricsAPI {
   constructor() {
     this.cache = new Map();
     this.loadCache();
@@ -15,6 +15,10 @@ class LyricsAPI {
    */
   async loadCache() {
     try {
+      if (typeof chrome === 'undefined' || !chrome.storage) {
+        console.warn('Chrome storage API not available, skipping cache load');
+        return;
+      }
       const result = await chrome.storage.local.get(['lyricsCache']);
       if (result.lyricsCache) {
         this.cache = new Map(Object.entries(result.lyricsCache));
@@ -30,6 +34,9 @@ class LyricsAPI {
    */
   async saveCache() {
     try {
+      if (typeof chrome === 'undefined' || !chrome.storage) {
+        return;
+      }
       const cacheObject = Object.fromEntries(this.cache);
       await chrome.storage.local.set({ lyricsCache: cacheObject });
     } catch (error) {
@@ -86,11 +93,13 @@ class LyricsAPI {
     // Check cache first
     const cached = this.getCached(query);
     if (cached) {
-      console.log('Lyrics found in cache');
+      console.log('✅ Lyrics found in cache');
       return cached;
     }
 
     const url = `${API.BASE_URL}${API.SEARCH_ENDPOINT}?q=${encodeURIComponent(query)}`;
+    
+    console.log('🌐 API Request URL:', url);
     
     try {
       const controller = new AbortController();
@@ -105,11 +114,16 @@ class LyricsAPI {
 
       clearTimeout(timeoutId);
 
+      console.log('🌐 API Response status:', response.status);
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+      
+      console.log('🌐 API Response data type:', Array.isArray(data) ? 'Array' : typeof data);
+      console.log('🌐 API Response length:', data?.length);
       
       // Cache the result
       this.setCache(query, data);
@@ -262,9 +276,8 @@ class LyricsAPI {
    */
   async clearCache() {
     this.cache.clear();
-    await chrome.storage.local.remove(['lyricsCache']);
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      await chrome.storage.local.remove(['lyricsCache']);
+    }
   }
 }
-
-// Export singleton instance
-export const lyricsAPI = new LyricsAPI();
