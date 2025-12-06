@@ -387,6 +387,16 @@ export class LyricsUI {
           const isCurrent = index === currentIndex;
           const isFuture = index > currentIndex;
 
+          // Show only 2 previous, 1 current, and 2 future lines
+          const distanceFromCurrent = Math.abs(index - currentIndex);
+          const shouldShow = isCurrent || 
+                           (isPast && index >= currentIndex - 2) || 
+                           (isFuture && index <= currentIndex + 2);
+          
+          line.style.display = shouldShow ? 'block' : 'none';
+          
+          if (!shouldShow) return; // Skip styling for hidden lines
+
           if (isCurrent) {
             line.classList.add('current');
             Object.assign(line.style, {
