@@ -97,8 +97,8 @@ export class LyricsUI {
     Object.assign(element.style, {
       flex: '1',
       overflowY: 'auto',
-      overflowX: 'hidden',
-      padding: '20px 0',
+      overflowX: 'visible',
+      padding: '20px 40px',
       textAlign: 'center',
       scrollBehavior: 'smooth',
       maskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%)',
@@ -327,7 +327,7 @@ export class LyricsUI {
       }
 
       Object.assign(lyricLine.style, {
-        padding: '12px 20px',
+        padding: '12px 40px',
         fontSize: styles.FONT_SIZE_BASE,
         lineHeight: styles.LINE_HEIGHT,
         color: 'rgba(255, 255, 255, 0.4)',
@@ -335,8 +335,14 @@ export class LyricsUI {
         transition: `all ${styles.TRANSITION_DURATION} cubic-bezier(0.4, 0, 0.2, 1)`,
         transform: 'scale(1)',
         fontWeight: '400',
-        maxWidth: '800px',
-        margin: '0 auto'
+        maxWidth: '100%',
+        width: '100%',
+        margin: '0 auto',
+        wordWrap: 'break-word',
+        overflowWrap: 'break-word',
+        whiteSpace: 'pre-wrap',
+        boxSizing: 'border-box',
+        textAlign: 'center'
       });
 
       // Click to seek
@@ -399,10 +405,23 @@ export class LyricsUI {
 
           if (isCurrent) {
             line.classList.add('current');
+            
+            // Calculate dynamic scale based on text length to prevent overflow
+            const textLength = line.textContent.length;
+            const baseScale = 1.5;
+            let scale;
+            if (textLength > 100) {
+              scale = 1.2; // Very long lyrics - smaller scale
+            } else if (textLength > 50) {
+              scale = 1.35; // Medium length - moderate scale
+            } else {
+              scale = baseScale; // Short lyrics - full scale
+            }
+            
             Object.assign(line.style, {
               color: '#ffffff',
               fontWeight: '600',
-              transform: 'translateZ(0) scale(1.5)',
+              transform: `translateZ(0) scale(${scale})`,
               transformOrigin: 'center',
               textShadow: '0 2px 12px rgba(255, 255, 255, 0.3)',
               margin: '16px 0',
