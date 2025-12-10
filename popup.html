@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>YouTube Lyrics</title>
+    <title>YouTube Lyrics — Settings</title>
     <style>
       * {
         margin: 0;
@@ -54,6 +54,14 @@
         font-size: 12px;
         opacity: 0.85;
         font-weight: 400;
+      }
+
+      .header-text .version {
+        font-size: 12px;
+        opacity: 0.85;
+        margin-top: 4px;
+        color: rgba(255,255,255,0.95);
+        font-weight: 600;
       }
 
       .content {
@@ -348,6 +356,52 @@
         font-size: 14px;
       }
 
+      /* Donation / Ko-fi */
+      .donation {
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 12px;
+        border: 1px solid rgba(255,255,255,0.04);
+      }
+
+      .donation-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .donation-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      .donation-desc {
+        font-size: 12px;
+        color: #bbb;
+        margin-bottom: 10px;
+      }
+
+      /* progress bar removed — kept button and description */
+
+      .kofi-button {
+        display: inline-block;
+        background: linear-gradient(135deg,#ff8a65,#ff5e62);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 13px;
+        box-shadow: 0 6px 18px rgba(255,94,98,0.12);
+      }
+
+      .kofi-button:hover {
+        transform: translateY(-1px);
+      }
+
       .footer {
         text-align: center;
         padding: 16px;
@@ -383,11 +437,20 @@
       </div>
       <div class="header-text">
         <h1>YouTube Lyrics</h1>
-        <p>Synchronized lyrics display</p>
+        <p>Synchronized lyrics for YouTube</p>
+        <p class="version" id="popup-version" aria-hidden="true"></p>
       </div>
     </div>
 
     <div class="content">
+      <!-- Donation Section -->
+      <div class="section donation" aria-label="Support the developer">
+        <div class="donation-header">
+          <div class="donation-title">Support development</div>
+        </div>
+        <div class="donation-desc">If you enjoy the extension, consider a small one-time donation.</div>
+        <a class="kofi-button" href="https://ko-fi.com/avkov" target="_blank" rel="noopener">Buy me a coffee on Ko‑fi</a>
+      </div>
       <!-- Enable/Disable Section -->
       <div class="section">
         <div class="section-header">
@@ -412,7 +475,7 @@
     </div>
 
     <div class="footer">
-      v2.0 • Made with ❤️
+      <span id="version-footer">v3</span> • Made with ❤️
     </div>
 
     <script src="popup.js"></script>

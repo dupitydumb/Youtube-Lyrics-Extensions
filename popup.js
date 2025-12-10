@@ -189,4 +189,17 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   }
+
+  // Populate version information from manifest and update title/footer
+  try {
+    const manifest = chrome.runtime.getManifest();
+    const version = manifest && manifest.version ? manifest.version : '';
+    const vf = document.getElementById('version-footer');
+    if (vf) vf.textContent = version ? `v${version}` : '';
+    const pv = document.getElementById('popup-version');
+    if (pv) pv.textContent = version ? `Version ${version}` : '';
+    if (version) document.title = `YouTube Lyrics — v${version}`;
+  } catch (e) {
+    // ignore errors getting manifest
+  }
 });
