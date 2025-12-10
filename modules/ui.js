@@ -428,6 +428,31 @@ export class LyricsUI {
               transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, margin 0.3s ease, font-size 0.3s ease'
             });
 
+            // Force full visibility using important flag to override external styles
+            try {
+              line.style.setProperty('color', '#ffffff', 'important');
+              line.style.setProperty('opacity', '1', 'important');
+            } catch (e) {}
+
+            // Make sure word spans on the current line are visible.
+            // Remove any lingering 'future'/'past' classes which have !important CSS rules
+            // that can force dim colors. In line highlight mode, mark all words as highlighted.
+            const wordsOnLine = line.querySelectorAll('.lyric-word');
+            wordsOnLine.forEach(w => {
+              w.classList.remove('future', 'past');
+              if (this.highlightMode === 'line') {
+                w.classList.add('highlighted');
+              } else {
+                w.classList.remove('highlighted');
+              }
+
+              // Also force bright color on each word element
+              try {
+                w.style.setProperty('color', '#ffffff', 'important');
+                w.style.setProperty('opacity', '1', 'important');
+              } catch (e) {}
+            });
+
             // Debounced scroll - only on index change
             if (!this._scrollTimeout) {
               const containerHeight = this.lyricsContainer.clientHeight;

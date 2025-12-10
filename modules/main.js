@@ -500,8 +500,23 @@ class YouTubeLyricsApp {
     const enabled = this.settings.get('showRomanization') === true;
     if (!enabled) return syncedLyrics;
     return syncedLyrics.map(line => {
-      const roman = Romanizer.romanize(line.text);
-      return roman ? { ...line, romanized: roman } : line;
+      // Remove any inline word-timing markers like <00:12.34> before romanizing
+      const cleanedLineText = line.text ? line.text.replace(/<\d{2}:\d{2}\.\d+>/g, '').trim() : '';
+      const romanLine = Romanizer.romanize(cleanedLineText);
+
+      const out = { ...line };
+      if (romanLine) out.romanized = romanLine;
+
+      // If word-level timings exist, attach per-word romanization as well
+      if (line.words && Array.isArray(line.words)) {
+        out.words = line.words.map(w => {
+          const cleanedWord = w.word ? w.word.replace(/<\d{2}:\d{2}\.\d+>/g, '').trim() : w.word;
+          const r = Romanizer.romanize(cleanedWord || '');
+          return { ...w, roman: r || '' };
+        });
+      }
+
+      return out;
     });
   }
 

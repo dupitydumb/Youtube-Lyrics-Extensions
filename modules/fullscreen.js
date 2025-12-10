@@ -262,77 +262,12 @@ export class FullscreenManager {
     const wrapper = document.createElement('div');
     wrapper.id = 'fullscreen-lyrics-wrapper';
     
+
     lyrics.forEach((lyric, index) => {
       const lyricLine = document.createElement('div');
       lyricLine.className = 'fullscreen-lyric-line future';
       lyricLine.dataset.index = index;
       lyricLine.dataset.time = lyric.time;
-      
-      // Check if lyric has word-level timing
-      if (lyric.words && lyric.words.length > 0) {
-        // Create word-by-word display
-        const wordsContainer = document.createElement('div');
-        lyric.words.forEach((wordData, wordIndex) => {
-          const wordSpan = document.createElement('span');
-          wordSpan.className = 'lyric-word future';
-          wordSpan.textContent = wordData.word;
-          wordSpan.dataset.wordIndex = wordIndex;
-          wordSpan.dataset.wordTime = wordData.time;
-          wordsContainer.appendChild(wordSpan);
-          
-          // Add space after word (except last word)
-          if (wordIndex < lyric.words.length - 1) {
-            wordsContainer.appendChild(document.createTextNode(' '));
-          }
-        });
-        lyricLine.appendChild(wordsContainer);
-        
-        // Add romanization if enabled (for word-level timing)
-        if (this.settings?.showRomanization && lyric.romanized) {
-          const romanDiv = document.createElement('div');
-          romanDiv.className = 'fullscreen-romanization';
-          romanDiv.textContent = lyric.romanized;
-          Object.assign(romanDiv.style, {
-            marginTop: '8px',
-            fontSize: '0.75em',
-            opacity: '0.9',
-            fontStyle: 'italic',
-            color: 'inherit'
-          });
-          lyricLine.appendChild(romanDiv);
-        }
-      } else {
-        // Regular line-by-line display
-        const shouldHideOriginal = lyric.romanized && 
-                                   this.settings?.showRomanization && 
-                                   this.settings?.hideOriginalLyrics;
-        
-        if (!shouldHideOriginal) {
-          const textDiv = document.createElement('div');
-          textDiv.textContent = lyric.text;
-          lyricLine.appendChild(textDiv);
-        }
-        
-        // Add romanization if enabled
-        if (this.settings?.showRomanization && lyric.romanized) {
-          const romanDiv = document.createElement('div');
-          romanDiv.className = 'fullscreen-romanization';
-          romanDiv.textContent = lyric.romanized;
-          Object.assign(romanDiv.style, {
-            marginTop: '8px',
-            fontSize: shouldHideOriginal ? '1em' : '0.75em',
-            opacity: shouldHideOriginal ? '1' : '0.9',
-            fontStyle: 'italic',
-            color: 'inherit'
-          });
-          lyricLine.appendChild(romanDiv);
-        }
-        
-        // If only showing romanization, set it as text content
-        if (shouldHideOriginal && !lyric.romanized) {
-          lyricLine.textContent = lyric.text;
-        }
-      }
 
       Object.assign(lyricLine.style, {
         padding: '20px 30px',
@@ -346,6 +281,100 @@ export class FullscreenManager {
         cursor: 'pointer',
         willChange: 'font-size, color'
       });
+
+      // Word-level timing: render each word and optional per-word romanization
+      if (lyric.words && lyric.words.length > 0) {
+        const wordsContainer = document.createElement('div');
+        wordsContainer.className = 'fullscreen-words-container';
+
+        lyric.words.forEach((wordData, wordIndex) => {
+          const wrapper = document.createElement('span');
+          wrapper.className = 'lyric-word-wrapper';
+          wrapper.style.display = 'inline-block';
+          wrapper.style.margin = '0 4px';
+
+          const wordSpan = document.createElement('span');
+          wordSpan.className = 'lyric-word future';
+          wordSpan.textContent = wordData.word;
+          wordSpan.dataset.wordIndex = wordIndex;
+          wordSpan.dataset.wordTime = wordData.time;
+          Object.assign(wordSpan.style, {
+            display: 'inline-block',
+            color: 'rgba(255,255,255,0.95)',
+            transition: 'color 0.15s ease, transform 0.15s ease',
+            fontWeight: '400'
+          });
+
+          wrapper.appendChild(wordSpan);
+
+          // Per-word romanization (if available and enabled)
+          if (this.settings?.showRomanization && wordData.roman) {
+            const romanSmall = document.createElement('div');
+            romanSmall.className = 'word-romanization';
+            romanSmall.textContent = wordData.roman;
+            Object.assign(romanSmall.style, {
+              fontSize: '0.65em',
+              opacity: '0.95',
+              fontStyle: 'italic',
+              marginTop: '4px',
+              color: 'rgba(255,255,255,0.85)'
+            });
+            wrapper.appendChild(romanSmall);
+          }
+
+          wordsContainer.appendChild(wrapper);
+        });
+
+        lyricLine.appendChild(wordsContainer);
+
+        // If a full-line romanized string exists, append it below words
+        if (this.settings?.showRomanization && lyric.romanized) {
+          const romanDiv = document.createElement('div');
+          romanDiv.className = 'fullscreen-romanization';
+          romanDiv.textContent = lyric.romanized;
+          Object.assign(romanDiv.style, {
+            marginTop: '10px',
+            fontSize: '0.85em',
+            opacity: '0.95',
+            fontStyle: 'italic',
+            color: 'rgba(255,255,255,0.85)'
+          });
+          lyricLine.appendChild(romanDiv);
+        }
+
+      } else {
+        // Line-by-line display
+        const shouldHideOriginal = lyric.romanized && this.settings?.showRomanization && this.settings?.hideOriginalLyrics;
+
+        if (!shouldHideOriginal) {
+          const textDiv = document.createElement('div');
+          textDiv.className = 'fullscreen-original-text';
+          textDiv.textContent = lyric.text.replace(/<\d{2}:\d{2}\.\d+>/g, '').trim();
+          Object.assign(textDiv.style, {
+            color: 'rgba(255,255,255,0.9)'
+          });
+          lyricLine.appendChild(textDiv);
+        }
+
+        if (this.settings?.showRomanization && lyric.romanized) {
+          const romanDiv = document.createElement('div');
+          romanDiv.className = 'fullscreen-romanization';
+          romanDiv.textContent = lyric.romanized;
+          Object.assign(romanDiv.style, {
+            marginTop: '8px',
+            fontSize: shouldHideOriginal ? '1em' : '0.85em',
+            opacity: shouldHideOriginal ? '1' : '0.95',
+            fontStyle: 'italic',
+            color: 'rgba(255,255,255,0.95)'
+          });
+          lyricLine.appendChild(romanDiv);
+        }
+
+        // If only showing romanization and original was missing, ensure text content
+        if (shouldHideOriginal && !lyric.romanized) {
+          lyricLine.textContent = lyric.text;
+        }
+      }
 
       // Click to seek
       lyricLine.addEventListener('click', () => {
@@ -384,20 +413,50 @@ export class FullscreenManager {
           if (isCurrent) {
             line.classList.add('current');
             line.classList.remove('past', 'future');
-            line.style.cssText = `
-              color: #ffffff !important;
-              font-size: 48px !important;
-              font-weight: 700 !important;
-              transform: translateZ(0) !important;
-              text-shadow: 0 0 20px rgba(255, 255, 255, 0.5), 0 2px 12px rgba(255, 255, 255, 0.3) !important;
-              padding: 20px 30px !important;
-              line-height: 1.8 !important;
-              text-align: center !important;
-              cursor: pointer !important;
-              transition: font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, text-shadow 0.3s ease !important;
-              opacity: 1 !important;
-              will-change: font-size, color !important;
-            `;
+            
+            // Use Object.assign instead of cssText to preserve inheritance
+            Object.assign(line.style, {
+              color: '#ffffff',
+              fontSize: '48px',
+              fontWeight: '700',
+              transform: 'translateZ(0)',
+              textShadow: '0 0 20px rgba(255, 255, 255, 0.5), 0 2px 12px rgba(255, 255, 255, 0.3)',
+              padding: '20px 30px',
+              lineHeight: '1.8',
+              textAlign: 'center',
+              cursor: 'pointer',
+              transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, text-shadow 0.3s ease',
+              opacity: '1',
+              willChange: 'font-size, color'
+            });
+
+            // Force bright, fully opaque color to override page/global CSS
+            try {
+              line.style.setProperty('color', '#ffffff', 'important');
+              line.style.setProperty('opacity', '1', 'important');
+            } catch (e) {}
+
+            // Ensure inner elements (original text and romanization) are fully visible
+            const orig = line.querySelector('.fullscreen-original-text');
+            if (orig) {
+              orig.style.color = '#ffffff';
+              orig.style.opacity = '1';
+              try { orig.style.setProperty('color', '#ffffff', 'important'); orig.style.setProperty('opacity', '1', 'important'); } catch(e) {}
+            }
+            const romanElems = line.querySelectorAll('.fullscreen-romanization, .word-romanization');
+            romanElems.forEach(el => {
+              el.style.color = '#ffffff';
+              el.style.opacity = '1';
+              try { el.style.setProperty('color', '#ffffff', 'important'); el.style.setProperty('opacity', '1', 'important'); } catch(e) {}
+            });
+            const wordSpans = line.querySelectorAll('.lyric-word');
+            wordSpans.forEach(w => {
+              w.style.color = '#ffffff';
+              w.style.fontWeight = '600';
+              w.style.transform = 'scale(1)';
+              w.style.textShadow = '0 2px 12px rgba(255,255,255,0.25)';
+              try { w.style.setProperty('color', '#ffffff', 'important'); w.style.setProperty('opacity', '1', 'important'); } catch(e) {}
+            });
 
             // Debounced scroll - only on index change
             if (!this._scrollTimeout) {
@@ -424,14 +483,36 @@ export class FullscreenManager {
               line.classList.add('future');
               line.classList.remove('past');
             }
+            
+            const fadedColor = isPast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.5)';
+            
             Object.assign(line.style, {
               fontSize: '32px',
               fontWeight: '400',
               transform: 'translateZ(0)',
               textShadow: 'none',
-              color: isPast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.5)',
+              color: fadedColor,
               transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease',
               willChange: 'font-size, color'
+            });
+
+            // Dim inner elements for non-current lines
+            const orig2 = line.querySelector('.fullscreen-original-text');
+            if (orig2) {
+              orig2.style.color = 'rgba(255,255,255,0.6)';
+              orig2.style.opacity = '0.9';
+            }
+            const romanElems2 = line.querySelectorAll('.fullscreen-romanization, .word-romanization');
+            romanElems2.forEach(el => {
+              el.style.color = 'rgba(255,255,255,0.7)';
+              el.style.opacity = '0.9';
+            });
+            const wordSpans2 = line.querySelectorAll('.lyric-word');
+            wordSpans2.forEach(w => {
+              w.style.color = 'rgba(255,255,255,0.6)';
+              w.style.fontWeight = '400';
+              w.style.transform = 'scale(1)';
+              w.style.textShadow = 'none';
             });
           }
         });
