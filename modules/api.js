@@ -140,6 +140,7 @@ export class TitleParser {
 export class LyricsAPI {
   constructor() {
     this.cache = new Map();
+    this._saveTimeout = null; // debounce save to storage
     this.loadCache();
   }
 
@@ -189,10 +190,13 @@ export class LyricsAPI {
     
     // Limit cache size
     if (this.cache.size > CACHE_CONFIG.MAX_SIZE) {
-      const entries = Array.from(this.cache.entries());
-      entries.sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
-      const toDelete = entries.slice(0, entries.length - CACHE_CONFIG.MAX_SIZE);
-      toDelete.forEach(([key]) => this.cache.delete(key));
+      // Evict oldest by insertion order (Map preserves insertion order)
+      const excess = this.cache.size - CACHE_CONFIG.MAX_SIZE;
+      const keys = this.cache.keys();
+      for (let i = 0; i < excess; i++) {
+        const k = keys.next().value;
+        if (k) this.cache.delete(k);
+      }
     }
   }
 
@@ -202,6 +206,11 @@ export class LyricsAPI {
   getCached(query) {
     const cached = this.cache.get(query);
     if (cached && Date.now() - cached.timestamp < CACHE_CONFIG.EXPIRY_TIME) {
+      // Move to most-recent (LRU) by re-inserting
+      try {
+        this.cache.delete(query);
+        this.cache.set(query, cached);
+      } catch (e) {}
       return cached.data;
     }
     return null;
@@ -215,7 +224,23 @@ export class LyricsAPI {
       data,
       timestamp: Date.now()
     });
-    this.saveCache();
+
+    // Enforce max size immediately (evict oldest)
+    if (this.cache.size > CACHE_CONFIG.MAX_SIZE) {
+      const excess = this.cache.size - CACHE_CONFIG.MAX_SIZE;
+      const keys = this.cache.keys();
+      for (let i = 0; i < excess; i++) {
+        const k = keys.next().value;
+        if (k) this.cache.delete(k);
+      }
+    }
+
+    // Debounce saving to chrome.storage to avoid frequent writes
+    if (this._saveTimeout) clearTimeout(this._saveTimeout);
+    this._saveTimeout = setTimeout(() => {
+      this.saveCache().catch(() => {});
+      this._saveTimeout = null;
+    }, 1000);
   }
 
   /**

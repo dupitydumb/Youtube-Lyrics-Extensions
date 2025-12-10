@@ -555,6 +555,16 @@ class YouTubeLyricsApp {
       this.sync.stop();
     }
     
+    // Destroy background elements to avoid leaking DOM/style nodes
+    if (this.background && typeof this.background.destroy === 'function') {
+      try { this.background.destroy(); } catch (e) { /* ignore */ }
+    }
+
+    // Cleanup YouTube integration (observers, intervals, listeners)
+    if (this.youtube && typeof this.youtube.cleanup === 'function') {
+      try { this.youtube.cleanup(); } catch (e) { /* ignore */ }
+    }
+    
     // Reset state BEFORE exiting fullscreen to prevent old lyrics from being restored
     this.currentVideoInfo = null;
     this.currentLyrics = null;

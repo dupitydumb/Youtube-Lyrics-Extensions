@@ -327,9 +327,35 @@ export class BackgroundManager {
       const data = await chrome.storage.sync.get(['backgroundMode', 'gradientTheme', 'customColors']);
       this.mode = data.backgroundMode || 'album';
       this.gradientTheme = data.gradientTheme || 'random';
-      this.customColors = result.customColors || [];
+      this.customColors = data.customColors || [];
     } catch (error) {
       // Failed to load background settings
+    }
+  }
+
+  /**
+   * Destroy background elements and styles to avoid memory leaks
+   */
+  destroy() {
+    try {
+      // Remove DOM element if present
+      if (this.element) {
+        try { this.element.remove(); } catch (e) { /* ignore */ }
+        this.element = null;
+      }
+
+      // Remove injected animation styles if present
+      const style = document.getElementById('vinyl-animations');
+      if (style && style.parentNode) {
+        try { style.parentNode.removeChild(style); } catch (e) { /* ignore */ }
+      }
+
+      // Clear any internal state
+      this.mode = 'album';
+      this.gradientTheme = 'random';
+      this.customColors = [];
+    } catch (e) {
+      // swallow errors during cleanup
     }
   }
 

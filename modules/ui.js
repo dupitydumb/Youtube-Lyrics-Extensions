@@ -14,6 +14,173 @@ export class LyricsUI {
     this.settingsRef = null; // Store settings reference for updates
     this.currentFontSize = 16; // Store current font size
     this.highlightMode = 'line'; // 'line' or 'word'
+    // Internal listener tracking to allow cleanup and avoid leaks
+    this._listeners = [];
+    this._lyricsStyleElement = null;
+    this._cachedLines = null;
+    this._scrollTimeout = null;
+    // rAF batching and visible range tracking
+    this._pendingUpdateArgs = null;
+    this._rafId = null;
+    this._visibleRange = { start: -1, end: -1 };
+    this._lastWordIndexMap = new Map();
+  }
+
+  /**
+   * Schedule a UI update; coalesces multiple rapid calls into a single rAF.
+   */
+  scheduleUpdate(currentIndex, currentTime = null, indexChanged = true) {
+    this._pendingUpdateArgs = { currentIndex, currentTime, indexChanged };
+    if (!this._rafId) {
+      this._rafId = requestAnimationFrame(() => {
+        this._rafId = null;
+        const args = this._pendingUpdateArgs;
+        this._pendingUpdateArgs = null;
+        this.performUpdate(args.currentIndex, args.currentTime, args.indexChanged);
+      });
+    }
+  }
+
+  /**
+   * Perform the actual DOM updates — optimized to only touch visible lines
+   */
+  performUpdate(currentIndex, currentTime = null, indexChanged = true) {
+    if (!this.lyricsContainer) return;
+
+    if (indexChanged || !this._cachedLines) {
+      this._cachedLines = this.lyricsContainer.querySelectorAll('.lyric-line');
+    }
+
+    const lyricLines = this._cachedLines;
+    const total = lyricLines.length;
+    if (total === 0) return;
+
+    // Compute visible window: current +-2
+    const newStart = Math.max(0, currentIndex - 2);
+    const newEnd = Math.min(total - 1, currentIndex + 2);
+
+    // Hide previously visible lines that are now outside new range
+    if (this._visibleRange.start !== -1) {
+      for (let i = this._visibleRange.start; i <= this._visibleRange.end; i++) {
+        if (i < newStart || i > newEnd) {
+          const line = lyricLines[i];
+          if (line) line.style.display = 'none';
+        }
+      }
+    }
+
+    // Update only lines within new visible range
+    for (let i = newStart; i <= newEnd; i++) {
+      const line = lyricLines[i];
+      if (!line) continue;
+
+      const isCurrent = i === currentIndex;
+      const isPast = i < currentIndex;
+
+      line.style.display = 'block';
+
+      if (isCurrent) {
+        line.classList.add('current');
+        // Apply current styling
+        try {
+          line.style.setProperty('color', '#ffffff', 'important');
+          line.style.setProperty('opacity', '1', 'important');
+        } catch (e) {}
+
+        // scale logic
+        const textLength = line.textContent.length;
+        const baseScale = 1.5;
+        let scale;
+        if (textLength > 100) scale = 1.2;
+        else if (textLength > 50) scale = 1.35;
+        else scale = baseScale;
+
+        Object.assign(line.style, {
+          fontWeight: '600',
+          transform: `translateZ(0) scale(${scale})`,
+          transformOrigin: 'center',
+          textShadow: '0 2px 12px rgba(255, 255, 255, 0.3)',
+          margin: '16px 0',
+          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, margin 0.3s ease, font-size 0.3s ease'
+        });
+
+        // Word highlighting handling
+        const wordsOnLine = line.querySelectorAll('.lyric-word');
+        wordsOnLine.forEach(w => {
+          w.classList.remove('future', 'past');
+          if (this.highlightMode === 'line') w.classList.add('highlighted');
+          else w.classList.remove('highlighted');
+          try { w.style.setProperty('color', '#ffffff', 'important'); w.style.setProperty('opacity', '1', 'important'); } catch (e) {}
+        });
+
+        // Debounced scroll
+        if (!this._scrollTimeout) {
+          const containerHeight = this.lyricsContainer.clientHeight;
+          const lineTop = line.offsetTop;
+          const lineHeight = line.offsetHeight;
+          const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
+          this.lyricsContainer.scrollTo({ top: scrollPosition, behavior: 'smooth' });
+        }
+      } else {
+        line.classList.remove('current');
+        Object.assign(line.style, {
+          fontWeight: '400',
+          transform: isPast ? 'translateZ(0) scale(0.95)' : 'translateZ(0) scale(1)',
+          transformOrigin: 'center',
+          textShadow: 'none',
+          margin: '0',
+          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, margin 0.3s ease, font-size 0.3s ease'
+        });
+
+        // Reset word highlighting for non-current lines
+        const words = line.querySelectorAll('.lyric-word');
+        words.forEach(word => {
+          word.classList.remove('highlighted');
+          if (isPast) {
+            word.classList.remove('future');
+            word.classList.add('past');
+          } else {
+            word.classList.remove('past');
+            word.classList.add('future');
+          }
+        });
+      }
+    }
+
+    this._visibleRange.start = newStart;
+    this._visibleRange.end = newEnd;
+
+    // Word-level updates for current line
+    if (currentTime !== null) {
+      const currentLine = lyricLines[currentIndex];
+      if (currentLine) this.updateWordHighlight(currentLine, currentTime);
+    }
+  }
+
+  /**
+   * Helper to add an event listener and track it for later removal
+   */
+  addListener(target, type, handler, options) {
+    try {
+      target.addEventListener(type, handler, options);
+      this._listeners.push({ target, type, handler, options });
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  /**
+   * Remove all tracked listeners
+   */
+  removeAllListeners() {
+    try {
+      this._listeners.forEach(({ target, type, handler, options }) => {
+        try { target.removeEventListener(type, handler, options); } catch (e) { }
+      });
+    } catch (e) {
+      // ignore
+    }
+    this._listeners = [];
   }
 
   /**
@@ -156,6 +323,8 @@ export class LyricsUI {
         background-clip: text;
       }
     `;
+    // Store injected style element so it can be removed on cleanup
+    this._lyricsStyleElement = style;
     document.head.appendChild(style);
   }
 
@@ -374,136 +543,8 @@ export class LyricsUI {
    * Update current lyric highlight with smooth animations
    */
   updateCurrentLyric(currentIndex, currentTime = null, indexChanged = true) {
-    if (!this.lyricsContainer) return;
-
-    const styles = UI_CONFIG.APPLE_MUSIC_STYLE;
-    
-    // Only query DOM when index changes for performance
-    if (indexChanged || !this._cachedLines) {
-      this._cachedLines = this.lyricsContainer.querySelectorAll('.lyric-line');
-    }
-    
-    const lyricLines = this._cachedLines;
-    
-    // Batch DOM updates in requestAnimationFrame for smoothness
-    if (indexChanged) {
-      requestAnimationFrame(() => {
-        lyricLines.forEach((line, index) => {
-          const isPast = index < currentIndex;
-          const isCurrent = index === currentIndex;
-          const isFuture = index > currentIndex;
-
-          // Show only 2 previous, 1 current, and 2 future lines
-          const distanceFromCurrent = Math.abs(index - currentIndex);
-          const shouldShow = isCurrent || 
-                           (isPast && index >= currentIndex - 2) || 
-                           (isFuture && index <= currentIndex + 2);
-          
-          line.style.display = shouldShow ? 'block' : 'none';
-          
-          if (!shouldShow) return; // Skip styling for hidden lines
-
-          if (isCurrent) {
-            line.classList.add('current');
-            
-            // Calculate dynamic scale based on text length to prevent overflow
-            const textLength = line.textContent.length;
-            const baseScale = 1.5;
-            let scale;
-            if (textLength > 100) {
-              scale = 1.2; // Very long lyrics - smaller scale
-            } else if (textLength > 50) {
-              scale = 1.35; // Medium length - moderate scale
-            } else {
-              scale = baseScale; // Short lyrics - full scale
-            }
-            
-            Object.assign(line.style, {
-              color: '#ffffff',
-              fontWeight: '600',
-              transform: `translateZ(0) scale(${scale})`,
-              transformOrigin: 'center',
-              textShadow: '0 2px 12px rgba(255, 255, 255, 0.3)',
-              margin: '16px 0',
-              transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, margin 0.3s ease, font-size 0.3s ease'
-            });
-
-            // Force full visibility using important flag to override external styles
-            try {
-              line.style.setProperty('color', '#ffffff', 'important');
-              line.style.setProperty('opacity', '1', 'important');
-            } catch (e) {}
-
-            // Make sure word spans on the current line are visible.
-            // Remove any lingering 'future'/'past' classes which have !important CSS rules
-            // that can force dim colors. In line highlight mode, mark all words as highlighted.
-            const wordsOnLine = line.querySelectorAll('.lyric-word');
-            wordsOnLine.forEach(w => {
-              w.classList.remove('future', 'past');
-              if (this.highlightMode === 'line') {
-                w.classList.add('highlighted');
-              } else {
-                w.classList.remove('highlighted');
-              }
-
-              // Also force bright color on each word element
-              try {
-                w.style.setProperty('color', '#ffffff', 'important');
-                w.style.setProperty('opacity', '1', 'important');
-              } catch (e) {}
-            });
-
-            // Debounced scroll - only on index change
-            if (!this._scrollTimeout) {
-              const containerHeight = this.lyricsContainer.clientHeight;
-              const lineTop = line.offsetTop;
-              const lineHeight = line.offsetHeight;
-              const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
-              
-              this.lyricsContainer.scrollTo({
-                top: scrollPosition,
-                behavior: 'smooth'
-              });
-            }
-
-          } else {
-            line.classList.remove('current');
-            Object.assign(line.style, {
-              fontWeight: '400',
-              transform: isPast ? 'translateZ(0) scale(0.95)' : 'translateZ(0) scale(1)',
-              transformOrigin: 'center',
-              textShadow: 'none',
-              margin: '0',
-              transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, margin 0.3s ease, font-size 0.3s ease',
-              color: isPast 
-                ? `rgba(255, 255, 255, ${styles.PAST_LINE_OPACITY})` 
-                : `rgba(255, 255, 255, ${styles.FUTURE_LINE_OPACITY})`
-            });
-            
-            // Reset word highlighting for non-current lines
-            const words = line.querySelectorAll('.lyric-word');
-            words.forEach(word => {
-              word.classList.remove('highlighted');
-              if (isPast) {
-                word.classList.remove('future');
-                word.classList.add('past');
-              } else {
-                word.classList.remove('past');
-                word.classList.add('future');
-              }
-            });
-          }
-        });
-      });
-    }
-    
-    // Word-level updates (happens every frame for word mode)
-    if (currentTime !== null) {
-      const currentLine = lyricLines[currentIndex];
-      if (currentLine) {
-        this.updateWordHighlight(currentLine, currentTime);
-      }
-    }
+    // Coalesce multiple rapid updates into a single rAF and perform optimized update
+    this.scheduleUpdate(currentIndex, currentTime, indexChanged);
   }
 
   /**
@@ -515,34 +556,48 @@ export class LyricsUI {
 
     // Only highlight words if in word mode
     if (this.highlightMode !== 'word') {
-      // In line mode, remove word-specific highlighting
       words.forEach(word => {
         word.classList.remove('highlighted', 'past', 'future');
       });
       return;
     }
 
-    words.forEach(word => {
-      const wordTime = parseFloat(word.dataset.wordTime);
-      
-      if (!isNaN(wordTime)) {
-        const timeDiff = currentTime - wordTime;
-        
-        if (timeDiff >= 0 && timeDiff < 0.3) {
-          // Current word being sung
-          word.classList.add('highlighted');
-          word.classList.remove('past', 'future');
-        } else if (timeDiff >= 0.3) {
-          // Past word
-          word.classList.remove('highlighted', 'future');
-          word.classList.add('past');
-        } else {
-          // Future word
-          word.classList.remove('highlighted', 'past');
-          word.classList.add('future');
-        }
+    // Convert NodeList to array for binary-like search
+    const wordArray = Array.from(words);
+    let low = 0, high = wordArray.length - 1, mid, currentWordIndex = -1;
+    while (low <= high) {
+      mid = Math.floor((low + high) / 2);
+      const wt = parseFloat(wordArray[mid].dataset.wordTime);
+      if (isNaN(wt)) { low = mid + 1; continue; }
+      if (wt <= currentTime) {
+        currentWordIndex = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
       }
-    });
+    }
+
+    const lineIndex = parseInt(lineElement.dataset.index || '-1', 10);
+    const lastIdx = this._lastWordIndexMap.get(lineIndex) ?? -1;
+    if (currentWordIndex === lastIdx) return; // nothing changed
+
+    // Update previous highlighted word
+    if (lastIdx >= 0 && wordArray[lastIdx]) {
+      const prev = wordArray[lastIdx];
+      prev.classList.remove('highlighted');
+      prev.classList.add('past');
+    }
+
+    // Update current highlighted word
+    if (currentWordIndex >= 0 && wordArray[currentWordIndex]) {
+      const cur = wordArray[currentWordIndex];
+      cur.classList.add('highlighted');
+      cur.classList.remove('past', 'future');
+    }
+
+    // Lazily mark words before current as past and after as future only when needed
+    // Update stored index
+    this._lastWordIndexMap.set(lineIndex, currentWordIndex);
   }
 
   /**
@@ -691,6 +746,22 @@ export class LyricsUI {
    * Remove the panel
    */
   removePanel() {
+    // Remove any tracked listeners first
+    this.removeAllListeners();
+
+    // Remove injected style element for lyrics container
+    if (this._lyricsStyleElement && this._lyricsStyleElement.parentNode) {
+      try { this._lyricsStyleElement.parentNode.removeChild(this._lyricsStyleElement); } catch (e) { }
+      this._lyricsStyleElement = null;
+    }
+
+    // Clear cached refs and timeouts
+    this._cachedLines = null;
+    if (this._scrollTimeout) {
+      try { clearTimeout(this._scrollTimeout); } catch (e) { }
+      this._scrollTimeout = null;
+    }
+
     if (this.container) {
       this.container.remove();
       this.container = null;
@@ -966,28 +1037,28 @@ export class LyricsUI {
     settingsPanel.style.display = 'none';
     container.appendChild(settingsPanel);
     
-    // Toggle settings panel
-    settingsBtn.addEventListener('click', (e) => {
+    // Toggle settings panel (track listeners for cleanup)
+    this.addListener(settingsBtn, 'click', (e) => {
       e.stopPropagation();
       const isVisible = settingsPanel.style.display !== 'none';
       settingsPanel.style.display = isVisible ? 'none' : 'block';
       settingsBtn.style.opacity = isVisible ? '0.9' : '1';
     });
-    
-    settingsBtn.addEventListener('mouseenter', () => {
+
+    this.addListener(settingsBtn, 'mouseenter', () => {
       if (settingsPanel.style.display === 'none') {
         settingsBtn.style.opacity = '1';
       }
     });
-    
-    settingsBtn.addEventListener('mouseleave', () => {
+
+    this.addListener(settingsBtn, 'mouseleave', () => {
       if (settingsPanel.style.display === 'none') {
         settingsBtn.style.opacity = '0.9';
       }
     });
-    
-    // Close panel when clicking outside
-    document.addEventListener('click', (e) => {
+
+    // Close panel when clicking outside (tracked)
+    this.addListener(document, 'click', (e) => {
       if (!container.contains(e.target)) {
         settingsPanel.style.display = 'none';
         settingsBtn.style.opacity = '0.9';
@@ -1248,7 +1319,7 @@ export class LyricsUI {
           isDragging = true;
         });
         
-        document.addEventListener('mousemove', (e) => {
+        this.addListener(document, 'mousemove', (e) => {
           if (isDragging) {
             const rect = sliderContainer.getBoundingClientRect();
             let percentage = ((e.clientX - rect.left) / rect.width) * 100;
@@ -1268,8 +1339,8 @@ export class LyricsUI {
             valueDiv.textContent = displayText;
           }
         });
-        
-        document.addEventListener('mouseup', (e) => {
+
+        this.addListener(document, 'mouseup', (e) => {
           if (isDragging) {
             isDragging = false;
             // Apply the setting only on mouseup to prevent lag

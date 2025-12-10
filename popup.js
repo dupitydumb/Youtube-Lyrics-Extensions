@@ -36,144 +36,179 @@ document.addEventListener("DOMContentLoaded", () => {
     const customColors = data.customColors || ['#667eea', '#764ba2', '#f093fb', '#4facfe'];
     const highlightMode = data.highlightMode || 'line';
     
-    toggleSwitch.checked = isEnabled;
-    updateStatus(isEnabled);
-    
-    fontSizeSlider.value = fontSize;
-    fontSizeValue.textContent = fontSize + "px";
-    
-    syncOffsetSlider.value = syncDelay;
-    syncOffsetValue.textContent = syncDelay + "ms";
-    
-    // Set background mode
-    backgroundModeSelect.value = backgroundMode;
-    if (backgroundMode === 'gradient') {
-      gradientThemeSection.style.display = 'block';
+    if (toggleSwitch) {
+      toggleSwitch.checked = isEnabled;
     }
-    
-    gradientThemeSelect.value = gradientTheme;
-    
+    updateStatus(isEnabled);
+
+    if (fontSizeSlider) {
+      fontSizeSlider.value = fontSize;
+    }
+    if (fontSizeValue) {
+      fontSizeValue.textContent = fontSize + "px";
+    }
+
+    if (syncOffsetSlider) {
+      syncOffsetSlider.value = syncDelay;
+    }
+    if (syncOffsetValue) {
+      syncOffsetValue.textContent = syncDelay + "ms";
+    }
+
+    // Set background mode if control exists
+    if (backgroundModeSelect) {
+      backgroundModeSelect.value = backgroundMode;
+      if (backgroundMode === 'gradient' && gradientThemeSection) {
+        gradientThemeSection.style.display = 'block';
+      }
+    }
+
+    if (gradientThemeSelect) {
+      gradientThemeSelect.value = gradientTheme;
+    }
+
     // Show custom colors if theme is custom
-    if (gradientTheme === 'custom') {
+    if (gradientTheme === 'custom' && customColorsSection) {
       customColorsSection.style.display = 'block';
     }
-    
-    // Set custom color values
+
+    // Set custom color values if inputs exist
     if (customColors.length >= 4) {
-      customColor1.value = customColors[0];
-      customColor2.value = customColors[1];
-      customColor3.value = customColors[2];
-      customColor4.value = customColors[3];
+      if (customColor1) customColor1.value = customColors[0];
+      if (customColor2) customColor2.value = customColors[1];
+      if (customColor3) customColor3.value = customColors[2];
+      if (customColor4) customColor4.value = customColors[3];
     }
-    
+
     // Set playback mode
-    playbackModeSelect.value = playbackMode;
+    if (playbackModeSelect) playbackModeSelect.value = playbackMode;
 
     // Set highlight mode
-    highlightModeSelect.value = highlightMode;
+    if (highlightModeSelect) highlightModeSelect.value = highlightMode;
   });
 
   // Toggle switch listener
-  toggleSwitch.addEventListener("change", () => {
-    const isEnabled = toggleSwitch.checked;
-    
-    chrome.storage.sync.set({ enabled: isEnabled }, () => {
-      updateStatus(isEnabled);
-      chrome.action.setBadgeText({ text: isEnabled ? "ON" : "" });
-      chrome.tabs.query({ url: "*://*.youtube.com/*" }, (tabs) => {
-        tabs.forEach(tab => chrome.tabs.reload(tab.id));
+  if (toggleSwitch) {
+    toggleSwitch.addEventListener("change", () => {
+      const isEnabled = toggleSwitch.checked;
+
+      chrome.storage.sync.set({ enabled: isEnabled }, () => {
+        updateStatus(isEnabled);
+        if (chrome.action && chrome.action.setBadgeText) {
+          chrome.action.setBadgeText({ text: isEnabled ? "ON" : "" });
+        }
+        chrome.tabs.query({ url: "*://*.youtube.com/*" }, (tabs) => {
+          tabs.forEach(tab => chrome.tabs.reload(tab.id));
+        });
       });
     });
-  });
+  }
 
   // Font size slider listener
-  fontSizeSlider.addEventListener("input", (e) => {
-    const fontSize = parseInt(e.target.value);
-    fontSizeValue.textContent = fontSize + "px";
-    
-    chrome.storage.sync.set({ fontSize }, () => {
-      sendMessageToTabs({ type: "updateFontSize", fontSize });
+  if (fontSizeSlider) {
+    fontSizeSlider.addEventListener("input", (e) => {
+      const fontSize = parseInt(e.target.value);
+      if (fontSizeValue) fontSizeValue.textContent = fontSize + "px";
+
+      chrome.storage.sync.set({ fontSize }, () => {
+        sendMessageToTabs({ type: "updateFontSize", fontSize });
+      });
     });
-  });
+  }
 
   // Sync offset slider listener
-  syncOffsetSlider.addEventListener("input", (e) => {
-    const syncDelay = parseInt(e.target.value);
-    syncOffsetValue.textContent = syncDelay + "ms";
-    
-    chrome.storage.sync.set({ syncDelay }, () => {
-      sendMessageToTabs({ type: "updateSyncDelay", syncDelay });
+  if (syncOffsetSlider) {
+    syncOffsetSlider.addEventListener("input", (e) => {
+      const syncDelay = parseInt(e.target.value);
+      if (syncOffsetValue) syncOffsetValue.textContent = syncDelay + "ms";
+
+      chrome.storage.sync.set({ syncDelay }, () => {
+        sendMessageToTabs({ type: "updateSyncDelay", syncDelay });
+      });
     });
-  });
+  }
 
   // Background mode select
-  backgroundModeSelect.addEventListener("change", (e) => {
-    const mode = e.target.value;
-    
-    // Show/hide gradient theme section
-    if (mode === 'gradient') {
-      gradientThemeSection.style.display = 'block';
-    } else {
-      gradientThemeSection.style.display = 'none';
-    }
-    
-    chrome.storage.sync.set({ backgroundMode: mode }, () => {
-      sendMessageToTabs({ type: "updateBackgroundMode", backgroundMode: mode });
+  if (backgroundModeSelect) {
+    backgroundModeSelect.addEventListener("change", (e) => {
+      const mode = e.target.value;
+
+      // Show/hide gradient theme section
+      if (gradientThemeSection) {
+        if (mode === 'gradient') {
+          gradientThemeSection.style.display = 'block';
+        } else {
+          gradientThemeSection.style.display = 'none';
+        }
+      }
+
+      chrome.storage.sync.set({ backgroundMode: mode }, () => {
+        sendMessageToTabs({ type: "updateBackgroundMode", backgroundMode: mode });
+      });
     });
-  });
+  }
 
   // Gradient theme select
-  gradientThemeSelect.addEventListener("change", (e) => {
-    const theme = e.target.value;
-    
-    // Show/hide custom colors section
-    if (theme === 'custom') {
-      customColorsSection.style.display = 'block';
-    } else {
-      customColorsSection.style.display = 'none';
-    }
-    
-    chrome.storage.sync.set({ gradientTheme: theme }, () => {
-      sendMessageToTabs({ type: "updateGradientTheme", gradientTheme: theme });
+  if (gradientThemeSelect) {
+    gradientThemeSelect.addEventListener("change", (e) => {
+      const theme = e.target.value;
+
+      // Show/hide custom colors section
+      if (customColorsSection) {
+        if (theme === 'custom') {
+          customColorsSection.style.display = 'block';
+        } else {
+          customColorsSection.style.display = 'none';
+        }
+      }
+
+      chrome.storage.sync.set({ gradientTheme: theme }, () => {
+        sendMessageToTabs({ type: "updateGradientTheme", gradientTheme: theme });
+      });
     });
-  });
+  }
 
   // Custom color inputs
   const updateCustomColors = () => {
-    const customColors = [
-      customColor1.value,
-      customColor2.value,
-      customColor3.value,
-      customColor4.value
-    ];
-    
+    const customColors = [];
+    if (customColor1) customColors.push(customColor1.value);
+    if (customColor2) customColors.push(customColor2.value);
+    if (customColor3) customColors.push(customColor3.value);
+    if (customColor4) customColors.push(customColor4.value);
+
+    if (customColors.length === 0) return;
+
     chrome.storage.sync.set({ customColors }, () => {
       sendMessageToTabs({ type: "updateCustomColors", customColors });
     });
   };
 
-  customColor1.addEventListener("change", updateCustomColors);
-  customColor2.addEventListener("change", updateCustomColors);
-  customColor3.addEventListener("change", updateCustomColors);
-  customColor4.addEventListener("change", updateCustomColors);
+  if (customColor1) customColor1.addEventListener("change", updateCustomColors);
+  if (customColor2) customColor2.addEventListener("change", updateCustomColors);
+  if (customColor3) customColor3.addEventListener("change", updateCustomColors);
+  if (customColor4) customColor4.addEventListener("change", updateCustomColors);
 
   // Playback mode select
-  playbackModeSelect.addEventListener("change", (e) => {
-    const mode = e.target.value;
-    
-    chrome.storage.sync.set({ playbackMode: mode }, () => {
-      sendMessageToTabs({ type: "updatePlaybackMode", playbackMode: mode });
+  if (playbackModeSelect) {
+    playbackModeSelect.addEventListener("change", (e) => {
+      const mode = e.target.value;
+
+      chrome.storage.sync.set({ playbackMode: mode }, () => {
+        sendMessageToTabs({ type: "updatePlaybackMode", playbackMode: mode });
+      });
     });
-  });
+  }
 
   // Highlight mode select
-  highlightModeSelect.addEventListener("change", (e) => {
-    const mode = e.target.value;
-    
-    chrome.storage.sync.set({ highlightMode: mode }, () => {
-      sendMessageToTabs({ type: "updateHighlightMode", highlightMode: mode });
+  if (highlightModeSelect) {
+    highlightModeSelect.addEventListener("change", (e) => {
+      const mode = e.target.value;
+
+      chrome.storage.sync.set({ highlightMode: mode }, () => {
+        sendMessageToTabs({ type: "updateHighlightMode", highlightMode: mode });
+      });
     });
-  });
+  }
 
   function updateStatus(isEnabled) {
     status.textContent = isEnabled ? "ON" : "OFF";

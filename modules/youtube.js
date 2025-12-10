@@ -17,6 +17,7 @@ export class YouTubeIntegration {
     this.currentTitle = '';
     this.titleObserver = null;
     this.urlCheckInterval = null;
+    this.urlObserver = null;
     this.onNavigateCallback = null;
   }
 
@@ -156,7 +157,9 @@ export class YouTubeIntegration {
       };
     };
 
-    const handleUrlChange = debounce(() => {
+    // Store handlers on the instance so they can be removed later
+    this._debounce = debounce;
+    this._handleUrlChange = debounce(() => {
       const currentUrl = window.location.href;
       const currentVideoId = this.getVideoId();
       
@@ -172,9 +175,10 @@ export class YouTubeIntegration {
         this.currentVideoId = '';
         this.triggerNavigate(true); // Navigate away
       }
+
     }, 250);
 
-    const handleTitleChange = debounce(() => {
+    this._handleTitleChange = debounce(() => {
       const title = this.getVideoTitle();
       if (title && title !== this.currentTitle) {
         this.currentTitle = title;
@@ -185,7 +189,7 @@ export class YouTubeIntegration {
     }, 250);
 
     // Create title observer
-    this.titleObserver = new MutationObserver(handleTitleChange);
+    this.titleObserver = new MutationObserver(this._handleTitleChange);
     
     const titleContainer = document.querySelector(this.selectors.TITLE_CONTAINER);
     if (titleContainer) {
@@ -193,15 +197,27 @@ export class YouTubeIntegration {
     }
 
     // Watch for YouTube navigation events
-    window.addEventListener('yt-navigate-finish', handleUrlChange);
-    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('yt-navigate-finish', this._handleUrlChange);
+    window.addEventListener('popstate', this._handleUrlChange);
 
-    // Fallback: Poll for URL changes
-    this.urlCheckInterval = setInterval(() => {
-      if (window.location.href !== this.currentUrl) {
-        handleUrlChange();
-      }
-    }, 1000);
+    // Fallback: observe DOM changes to detect SPA navigation without polling
+    try {
+      this.urlObserver = new MutationObserver(() => {
+        if (window.location.href !== this.currentUrl) {
+          // Use the debounced handler for consistency
+          if (this._handleUrlChange) this._handleUrlChange();
+        }
+      });
+
+      this.urlObserver.observe(document.body, { childList: true, subtree: true, attributes: true });
+    } catch (e) {
+      // If MutationObserver not available, fall back to light polling
+      this.urlCheckInterval = setInterval(() => {
+        if (window.location.href !== this.currentUrl) {
+          if (this._handleUrlChange) this._handleUrlChange();
+        }
+      }, 3000);
+    }
 
     // Initial check
     this.currentUrl = window.location.href;
@@ -248,9 +264,29 @@ export class YouTubeIntegration {
       this.titleObserver = null;
     }
 
+    if (this.urlObserver) {
+      try { this.urlObserver.disconnect(); } catch (e) { }
+      this.urlObserver = null;
+    }
+
     if (this.urlCheckInterval) {
       clearInterval(this.urlCheckInterval);
       this.urlCheckInterval = null;
+    }
+
+    // Remove navigation event listeners if present
+    try {
+      if (this._handleUrlChange) {
+        window.removeEventListener('yt-navigate-finish', this._handleUrlChange);
+        window.removeEventListener('popstate', this._handleUrlChange);
+        this._handleUrlChange = null;
+      }
+
+      if (this._handleTitleChange) {
+        this._handleTitleChange = null;
+      }
+    } catch (e) {
+      // ignore
     }
   }
 
