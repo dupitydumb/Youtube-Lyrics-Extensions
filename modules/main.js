@@ -23,7 +23,7 @@ class YouTubeLyricsApp {
     this.background = new BackgroundManager();
     this.youtube = new YouTubeIntegration();
     this.fullscreen = new FullscreenManager(this.background);
-    
+
     this.currentVideoInfo = null;
     this.currentLyrics = null;
     this.albumArtUrl = null;
@@ -36,24 +36,24 @@ class YouTubeLyricsApp {
     // Load settings
     await this.settings.load();
     await this.background.loadSettings();
-    
+
     // Load highlight mode
     this.highlightMode = this.settings.get('highlightMode') || 'line';
     this.ui.setHighlightMode(this.highlightMode);
-    
+
     // Check if extension is enabled
     if (!this.settings.get('enabled')) {
       return;
     }
-    
+
     // Setup settings listener
     this.settings.listenToStorageChanges();
     this.setupSettingsHandlers();
     this.setupMessageListeners();
-    
+
     // Setup event handlers
     this.setupEventHandlers();
-    
+
     // Watch for YouTube navigation
     this.youtube.watchNavigation((videoInfo) => {
       if (videoInfo) {
@@ -62,7 +62,7 @@ class YouTubeLyricsApp {
         this.handleNavigateAway();
       }
     });
-    
+
     // Check if already on a video page when extension loads
     if (this.youtube.isVideoPage()) {
       const observer = new MutationObserver((mutations, obs) => {
@@ -91,11 +91,11 @@ class YouTubeLyricsApp {
       if (changes.fontSize !== undefined) {
         this.ui.setFontSize(changes.fontSize);
       }
-      
+
       if (changes.syncDelay !== undefined) {
         this.sync.setDelay(changes.syncDelay);
       }
-      
+
       if (changes.highlightMode !== undefined) {
         this.highlightMode = changes.highlightMode;
         this.ui.setHighlightMode(changes.highlightMode);
@@ -108,10 +108,10 @@ class YouTubeLyricsApp {
           this.renderCurrentLyrics();
         }
       }
-      
-      if (changes.backgroundMode !== undefined || 
-          changes.gradientTheme !== undefined || 
-          changes.customColors !== undefined) {
+
+      if (changes.backgroundMode !== undefined ||
+        changes.gradientTheme !== undefined ||
+        changes.customColors !== undefined) {
         this.background.mode = changes.backgroundMode || this.background.mode;
         this.background.gradientTheme = changes.gradientTheme || this.background.gradientTheme;
         this.background.customColors = changes.customColors || this.background.customColors;
@@ -165,13 +165,13 @@ class YouTubeLyricsApp {
     // Sync events
     this.sync.onUpdate((data) => {
       this.ui.updateCurrentLyric(data.currentIndex, data.currentTime, data.indexChanged);
-      
+
       // If fullscreen is active, update there too
       if (this.fullscreen.isActive) {
         this.fullscreen.updateCurrentLyric(data.currentIndex, data.currentTime, data.indexChanged);
       }
     });
-    
+
     // Fullscreen exit handler
     this.fullscreen.onExit(() => {
       // Restore UI in panel
@@ -189,23 +189,23 @@ class YouTubeLyricsApp {
    */
   async handleVideoChange(videoInfo) {
     this.currentVideoInfo = videoInfo;
-    
+
     // Reset state
     this.cleanup();
-    
+
     // Wait for secondary panel to be ready (should already be available since we waited in triggerNavigate)
     try {
       const secondaryInner = document.querySelector('#secondary-inner');
-      
+
       // Create UI
       const panel = this.ui.createPanel(secondaryInner);
-      
+
       // Create background layer
       const bgLayer = this.background.createBackgroundLayer();
       if (panel && bgLayer) {
         panel.insertBefore(bgLayer, panel.firstChild);
       }
-      
+
       // Create video player controls (toggle and fullscreen buttons)
       this.ui.createVideoPlayerControls(
         () => {
@@ -268,13 +268,13 @@ class YouTubeLyricsApp {
           }
         }
       );
-      
+
       // Show loading
       this.ui.showLoading();
-      
+
       // Load lyrics
       await this.loadLyrics(videoInfo);
-      
+
     } catch (error) {
       // Failed to initialize panel
     }
@@ -295,12 +295,22 @@ class YouTubeLyricsApp {
    */
   toggleFullscreen() {
     if (!this.currentLyrics) return;
-    
+
     if (this.fullscreen.isActive) {
       this.fullscreen.exit();
     } else {
       this.fullscreen.setHighlightMode(this.highlightMode);
-      this.fullscreen.enter(this.currentLyrics, this.sync.currentIndex, this.albumArtUrl, this.ui.settingsRef);
+      // Pass song title and artist name to fullscreen
+      const songTitle = this.currentVideoInfo?.title || '';
+      const artistName = this.currentVideoInfo?.artist || '';
+      this.fullscreen.enter(
+        this.currentLyrics,
+        this.sync.currentIndex,
+        this.albumArtUrl,
+        this.ui.settingsRef,
+        songTitle,
+        artistName
+      );
     }
   }
 
@@ -311,10 +321,10 @@ class YouTubeLyricsApp {
     try {
       // Import TitleParser from api module
       const { TitleParser } = await import('./api.js');
-      
+
       // Parse the title to extract song and artist intelligently
       const parsed = TitleParser.parseTitle(videoInfo.title, videoInfo.artist);
-      
+
       // Define search strategies in priority order
       const strategies = [
         // Strategy 1: Parsed song + parsed artist (highest confidence)
@@ -374,19 +384,19 @@ class YouTubeLyricsApp {
           enabled: videoInfo.title
         }
       ];
-      
+
       // Try each strategy until we get good results
       let results = null;
       let successfulStrategy = null;
-      
+
       for (const strategy of strategies) {
         if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
           continue;
         }
-        
+
         try {
           results = await this.api.searchLyrics(strategy.query);
-          
+
           if (results && results.length > 0) {
             successfulStrategy = strategy;
             break;
@@ -396,20 +406,20 @@ class YouTubeLyricsApp {
           continue;
         }
       }
-      
+
       if (!results || results.length === 0) {
         this.ui.showError('No lyrics found for this song');
         return;
       }
-      
+
       // Process results with enhanced metadata
       this.processLyricsResults(
-        results, 
-        videoInfo, 
+        results,
+        videoInfo,
         successfulStrategy ? successfulStrategy.songName : videoInfo.title,
         successfulStrategy ? successfulStrategy.artistName : videoInfo.artist
       );
-      
+
     } catch (error) {
       this.ui.showError('Failed to load lyrics');
     }
@@ -421,70 +431,73 @@ class YouTubeLyricsApp {
   async processLyricsResults(results, videoInfo, songName = '', artistName = '') {
     // Find best match with enhanced fuzzy matching
     const bestMatch = this.api.findBestMatch(
-      results, 
+      results,
       artistName || videoInfo.artist,
       songName || videoInfo.title
     );
-    
+
     if (!bestMatch) {
       this.ui.showError('No lyrics found for this song');
       return;
     }
-    
+
     // Parse synced lyrics
     if (bestMatch.syncedLyrics) {
       const syncedLyrics = this.api.parseSyncedLyrics(bestMatch.syncedLyrics);
       // Attach romanization if enabled
       const withRoman = this.applyRomanizationIfNeeded(syncedLyrics);
       this.currentLyrics = withRoman;
-        
-        // Update title and artist in header
-        this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist);
-        
-        // Display lyrics
-        this.ui.displaySyncedLyrics(this.currentLyrics);
-        
-        // Apply stored font size
-        const storedFontSize = this.settings.get('fontSize');
-        if (storedFontSize) {
-          this.ui.setFontSize(storedFontSize);
-        }
-        
-        // Create controls
-        this.createControls(bestMatch, results);
-        
-        // Setup sync
-        const videoElement = this.youtube.getVideoElement();
-        if (videoElement) {
-          this.sync.initialize(videoElement, syncedLyrics, this.settings.get('syncDelay'));
-          this.sync.start();
-        }
-        
-        // Load album art and update background
-        this.albumArtUrl = await this.youtube.extractAlbumArt();
-        if (this.albumArtUrl) {
-          this.background.updateBackground(this.albumArtUrl);
-        }
-        
-      } else if (bestMatch.plainLyrics) {
-        // Update title and artist in header
-        this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist);
-        
-        // Display plain lyrics
-        const plain = bestMatch.plainLyrics;
-        const romanizedPlain = this.applyRomanizationToPlainIfNeeded(plain);
-        this.ui.displayPlainLyrics(romanizedPlain);
-        
-        // Apply stored font size
-        const storedFontSize = this.settings.get('fontSize');
-        if (storedFontSize) {
-          this.ui.setFontSize(storedFontSize);
-        }
-        
-        this.createControls(bestMatch, results);
-      } else {
-        this.ui.showError('No lyrics available for this song');
+
+      // Update title and artist in header
+      this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist);
+
+      // Display lyrics
+      this.ui.displaySyncedLyrics(this.currentLyrics);
+
+      // Apply stored font size
+      const storedFontSize = this.settings.get('fontSize');
+      if (storedFontSize) {
+        this.ui.setFontSize(storedFontSize);
       }
+
+      // Create controls
+      this.createControls(bestMatch, results);
+
+      // Setup sync
+      const videoElement = this.youtube.getVideoElement();
+      if (videoElement) {
+        this.sync.initialize(videoElement, syncedLyrics, this.settings.get('syncDelay'));
+        this.sync.start();
+      }
+
+      // Load album art and update background
+      this.albumArtUrl = await this.youtube.extractAlbumArt();
+      if (this.albumArtUrl) {
+        this.background.updateBackground(this.albumArtUrl);
+        // Update album cover in panel if setting is enabled
+        const showInPanel = this.settings.get('showAlbumCoverInPanel');
+        this.ui.updateAlbumCover(this.albumArtUrl, showInPanel);
+      }
+
+    } else if (bestMatch.plainLyrics) {
+      // Update title and artist in header
+      this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist);
+
+      // Display plain lyrics
+      const plain = bestMatch.plainLyrics;
+      const romanizedPlain = this.applyRomanizationToPlainIfNeeded(plain);
+      this.ui.displayPlainLyrics(romanizedPlain);
+
+      // Apply stored font size
+      const storedFontSize = this.settings.get('fontSize');
+      if (storedFontSize) {
+        this.ui.setFontSize(storedFontSize);
+      }
+
+      this.createControls(bestMatch, results);
+    } else {
+      this.ui.showError('No lyrics available for this song');
+    }
   }
 
   renderCurrentLyrics() {
@@ -554,7 +567,7 @@ class YouTubeLyricsApp {
     if (this.sync) {
       this.sync.stop();
     }
-    
+
     // Destroy background elements to avoid leaking DOM/style nodes
     if (this.background && typeof this.background.destroy === 'function') {
       try { this.background.destroy(); } catch (e) { /* ignore */ }
@@ -564,17 +577,17 @@ class YouTubeLyricsApp {
     if (this.youtube && typeof this.youtube.cleanup === 'function') {
       try { this.youtube.cleanup(); } catch (e) { /* ignore */ }
     }
-    
+
     // Reset state BEFORE exiting fullscreen to prevent old lyrics from being restored
     this.currentVideoInfo = null;
     this.currentLyrics = null;
     this.albumArtUrl = null;
-    
+
     // Exit fullscreen
     if (this.fullscreen && this.fullscreen.isActive) {
       this.fullscreen.exit();
     }
-    
+
     // Remove UI
     if (this.ui) {
       this.ui.removePanel();

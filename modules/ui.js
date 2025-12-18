@@ -81,27 +81,33 @@ export class LyricsUI {
 
       if (isCurrent) {
         line.classList.add('current');
-        // Apply current styling
+        // Apply Apple Music-style current line styling
         try {
           line.style.setProperty('color', '#ffffff', 'important');
           line.style.setProperty('opacity', '1', 'important');
-        } catch (e) {}
+        } catch (e) { }
 
-        // scale logic
+        // Dynamic scale based on text length for better readability
         const textLength = line.textContent.length;
-        const baseScale = 1.5;
+        const baseScale = 1.6;
         let scale;
-        if (textLength > 100) scale = 1.2;
-        else if (textLength > 50) scale = 1.35;
+        if (textLength > 100) scale = 1.25;
+        else if (textLength > 60) scale = 1.4;
         else scale = baseScale;
 
         Object.assign(line.style, {
-          fontWeight: '600',
-          transform: `translateZ(0) scale(${scale})`,
+          fontWeight: '700',
+          fontSize: '20px',
+          transform: `translateZ(0) scale(${scale}) translateY(0)`,
           transformOrigin: 'center',
-          textShadow: '0 2px 12px rgba(255, 255, 255, 0.3)',
-          margin: '16px 0',
-          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, margin 0.3s ease, font-size 0.3s ease'
+          textShadow: '0 0 30px rgba(255, 255, 255, 0.4), 0 0 60px rgba(255, 255, 255, 0.2), 0 2px 20px rgba(255, 255, 255, 0.3)',
+          margin: '24px 0',
+          letterSpacing: '-0.01em',
+          transition: 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), margin 0.5s ease',
+          background: 'linear-gradient(90deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.9) 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text'
         });
 
         // Word highlighting handling
@@ -110,10 +116,10 @@ export class LyricsUI {
           w.classList.remove('future', 'past');
           if (this.highlightMode === 'line') w.classList.add('highlighted');
           else w.classList.remove('highlighted');
-          try { w.style.setProperty('color', '#ffffff', 'important'); w.style.setProperty('opacity', '1', 'important'); } catch (e) {}
+          try { w.style.setProperty('color', '#ffffff', 'important'); w.style.setProperty('opacity', '1', 'important'); } catch (e) { }
         });
 
-        // Debounced scroll
+        // Debounced smooth scroll
         if (!this._scrollTimeout) {
           const containerHeight = this.lyricsContainer.clientHeight;
           const lineTop = line.offsetTop;
@@ -123,13 +129,26 @@ export class LyricsUI {
         }
       } else {
         line.classList.remove('current');
+
+        // Differentiate past and future with subtle animations
+        const fadedOpacity = isPast ? '0.6' : '0.8';
+        const fadedColor = isPast ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.35)';
+        const transformValue = isPast ? 'translateZ(0) scale(0.96) translateY(0)' : 'translateZ(0) scale(1) translateY(0)';
+
         Object.assign(line.style, {
           fontWeight: '400',
-          transform: isPast ? 'translateZ(0) scale(0.95)' : 'translateZ(0) scale(1)',
+          fontSize: '17px',
+          transform: transformValue,
           transformOrigin: 'center',
           textShadow: 'none',
-          margin: '0',
-          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, margin 0.3s ease, font-size 0.3s ease'
+          margin: '2px 0',
+          letterSpacing: '0.01em',
+          opacity: fadedOpacity,
+          color: fadedColor,
+          transition: 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          background: 'none',
+          WebkitTextFillColor: 'inherit',
+          backgroundClip: 'border-box'
         });
 
         // Reset word highlighting for non-current lines
@@ -212,7 +231,7 @@ export class LyricsUI {
     this.panel.appendChild(this.lyricsContainer);
 
     this.container.appendChild(this.panel);
-    
+
     // Insert at the beginning of parent
     parentElement.insertBefore(this.container, parentElement.firstChild);
 
@@ -333,19 +352,36 @@ export class LyricsUI {
    */
   createHeader() {
     const header = document.createElement('div');
+    header.id = 'lyrics-header-container';
     Object.assign(header.style, {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
+      gap: '1rem',
       paddingBottom: '16px',
       borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
       zIndex: '100'
     });
 
+    // Album cover (optional, will be shown later when updateAlbumCover is called)
+    const albumCover = document.createElement('img');
+    albumCover.id = 'panel-album-cover';
+    albumCover.alt = 'Album Cover';
+    albumCover.style.cssText = `
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      display: none;
+      flex-shrink: 0;
+    `;
+
     const titleContainer = document.createElement('div');
     titleContainer.id = 'lyrics-title';
     Object.assign(titleContainer.style, {
-      textAlign: 'center'
+      textAlign: 'center',
+      flex: '1'
     });
 
     const title = document.createElement('h3');
@@ -379,6 +415,8 @@ export class LyricsUI {
 
     titleContainer.appendChild(title);
     titleContainer.appendChild(artist);
+
+    header.appendChild(albumCover);
     header.appendChild(titleContainer);
 
     return header;
@@ -410,7 +448,7 @@ export class LyricsUI {
 
     // Clear using replaceChildren for Trusted Types compatibility
     this.lyricsContainer.replaceChildren();
-    
+
     const lyricsText = document.createElement('div');
     Object.assign(lyricsText.style, {
       whiteSpace: 'pre-wrap',
@@ -421,7 +459,7 @@ export class LyricsUI {
       maxWidth: '800px',
       margin: '0 auto'
     });
-    
+
     lyricsText.textContent = lyrics;
     this.lyricsContainer.appendChild(lyricsText);
   }
@@ -444,20 +482,20 @@ export class LyricsUI {
       lyricLine.className = 'lyric-line';
       lyricLine.dataset.index = index;
       lyricLine.dataset.time = lyric.time;
-      
+
       // Check if we should hide original lyrics when showing romanization
-      const shouldHideOriginal = lyric.romanized && 
-                                 this.settingsRef?.showRomanization && 
-                                 this.settingsRef?.hideOriginalLyrics;
-      
+      const shouldHideOriginal = lyric.romanized &&
+        this.settingsRef?.showRomanization &&
+        this.settingsRef?.hideOriginalLyrics;
+
       // Create a container for the main lyric text
       const textContainer = document.createElement('div');
-      
+
       // If showing romanization and hideOriginalLyrics is enabled, hide the original text
       if (shouldHideOriginal) {
         textContainer.style.display = 'none';
       }
-      
+
       // Check if lyric has word-level timing
       if (lyric.words && lyric.words.length > 0) {
         // Create word-by-word display
@@ -468,7 +506,7 @@ export class LyricsUI {
           wordSpan.dataset.wordIndex = wordIndex;
           wordSpan.dataset.wordTime = wordData.time;
           textContainer.appendChild(wordSpan);
-          
+
           // Add space after word (except last word)
           if (wordIndex < lyric.words.length - 1) {
             textContainer.appendChild(document.createTextNode(' '));
@@ -478,7 +516,7 @@ export class LyricsUI {
         // Regular line-by-line display
         textContainer.textContent = lyric.text;
       }
-      
+
       lyricLine.appendChild(textContainer);
 
       // Optional romanization displayed beneath (or as main text if original is hidden)
@@ -496,42 +534,48 @@ export class LyricsUI {
       }
 
       Object.assign(lyricLine.style, {
-        padding: '12px 40px',
-        fontSize: styles.FONT_SIZE_BASE,
-        lineHeight: styles.LINE_HEIGHT,
-        color: 'rgba(255, 255, 255, 0.4)',
+        padding: '16px 40px',
+        fontSize: '17px',
+        lineHeight: '1.6',
+        color: 'rgba(255, 255, 255, 0.35)',
         cursor: 'pointer',
-        transition: `all ${styles.TRANSITION_DURATION} cubic-bezier(0.4, 0, 0.2, 1)`,
-        transform: 'scale(1)',
+        transition: 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+        transform: 'scale(1) translateY(0)',
         fontWeight: '400',
         maxWidth: '100%',
         width: '100%',
-        margin: '0 auto',
+        margin: '2px 0',
         wordWrap: 'break-word',
         overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
         boxSizing: 'border-box',
-        textAlign: 'center'
+        textAlign: 'center',
+        opacity: '0.8',
+        letterSpacing: '0.01em'
       });
 
       // Click to seek
       lyricLine.addEventListener('click', () => {
-        const event = new CustomEvent('lyric-seek', { 
-          detail: { index, time: lyric.time } 
+        const event = new CustomEvent('lyric-seek', {
+          detail: { index, time: lyric.time }
         });
         document.dispatchEvent(event);
       });
 
-      // Hover effect
+      // Enhanced hover effect with smooth transitions
       lyricLine.addEventListener('mouseenter', () => {
         if (!lyricLine.classList.contains('current')) {
           lyricLine.style.color = 'rgba(255, 255, 255, 0.7)';
+          lyricLine.style.transform = 'scale(1.02) translateY(-1px)';
+          lyricLine.style.opacity = '1';
         }
       });
 
       lyricLine.addEventListener('mouseleave', () => {
         if (!lyricLine.classList.contains('current')) {
-          lyricLine.style.color = 'rgba(255, 255, 255, 0.4)';
+          lyricLine.style.color = 'rgba(255, 255, 255, 0.35)';
+          lyricLine.style.transform = 'scale(1) translateY(0)';
+          lyricLine.style.opacity = '0.8';
         }
       });
 
@@ -622,6 +666,22 @@ export class LyricsUI {
   }
 
   /**
+   * Update album cover in panel header
+   */
+  updateAlbumCover(imageUrl, showInPanel = true) {
+    const albumCoverElement = document.getElementById('panel-album-cover');
+
+    if (!albumCoverElement) return;
+
+    if (imageUrl && showInPanel) {
+      albumCoverElement.src = imageUrl;
+      albumCoverElement.style.display = 'block';
+    } else {
+      albumCoverElement.style.display = 'none';
+    }
+  }
+
+  /**
    * Add a control element
    */
   addControl(element) {
@@ -636,7 +696,7 @@ export class LyricsUI {
   createSelect(id, options, onChange) {
     const select = document.createElement('select');
     select.id = id;
-    
+
     Object.assign(select.style, {
       background: 'rgba(255, 255, 255, 0.1)',
       color: '#ffffff',
@@ -675,7 +735,7 @@ export class LyricsUI {
   createButton(text, onClick) {
     const button = document.createElement('button');
     button.textContent = text;
-    
+
     Object.assign(button.style, {
       background: 'rgba(255, 255, 255, 0.1)',
       color: '#ffffff',
@@ -804,13 +864,13 @@ export class LyricsUI {
    */
   setFontSize(size) {
     this.currentFontSize = size; // Store the current font size
-    
+
     if (this.lyricsContainer) {
       // Set base font size
       this.lyricsContainer.style.setProperty('--lyrics-font-size', `${size}px`);
       this.lyricsContainer.style.setProperty('--lyrics-current-font-size', `${size * 1.5}px`);
       this.lyricsContainer.style.setProperty('--lyrics-past-font-size', `${size * 0.95}px`);
-      
+
       // Also update all lyric lines directly
       const lyricLines = this.lyricsContainer.querySelectorAll('.lyric-line');
       lyricLines.forEach(line => {
@@ -837,14 +897,14 @@ export class LyricsUI {
    */
   createSongSelector(results, onSelect) {
     if (!this.controlsContainer || !results || results.length <= 1) return;
-    
+
     const container = document.createElement('div');
     Object.assign(container.style, {
       display: 'flex',
       flexDirection: 'column',
       gap: '8px'
     });
-    
+
     const label = document.createElement('label');
     label.textContent = 'Song Version:';
     Object.assign(label.style, {
@@ -852,7 +912,7 @@ export class LyricsUI {
       color: 'rgba(255, 255, 255, 0.7)',
       fontWeight: '500'
     });
-    
+
     const select = document.createElement('select');
     Object.assign(select.style, {
       padding: '8px 12px',
@@ -864,21 +924,21 @@ export class LyricsUI {
       cursor: 'pointer',
       outline: 'none'
     });
-    
+
     results.forEach((result, index) => {
       const option = document.createElement('option');
       option.value = index;
       option.textContent = `${result.trackName} - ${result.artistName}${result.albumName ? ' (' + result.albumName + ')' : ''}`;
       select.appendChild(option);
     });
-    
+
     select.addEventListener('change', (e) => {
       const selectedIndex = parseInt(e.target.value);
       if (onSelect) {
         onSelect(results[selectedIndex]);
       }
     });
-    
+
     container.appendChild(label);
     container.appendChild(select);
     this.controlsContainer.appendChild(container);
@@ -889,14 +949,14 @@ export class LyricsUI {
    */
   createBackgroundSelector(currentMode, currentTheme, onChange) {
     if (!this.controlsContainer) return;
-    
+
     const container = document.createElement('div');
     Object.assign(container.style, {
       display: 'flex',
       flexDirection: 'column',
       gap: '8px'
     });
-    
+
     const label = document.createElement('label');
     label.textContent = 'Background:';
     Object.assign(label.style, {
@@ -904,7 +964,7 @@ export class LyricsUI {
       color: 'rgba(255, 255, 255, 0.7)',
       fontWeight: '500'
     });
-    
+
     const select = document.createElement('select');
     Object.assign(select.style, {
       padding: '8px 12px',
@@ -916,14 +976,14 @@ export class LyricsUI {
       cursor: 'pointer',
       outline: 'none'
     });
-    
+
     const modes = [
       { value: 'album', label: 'Album Art' },
       { value: 'gradient', label: 'Gradient' },
       { value: 'vinyl', label: 'Vinyl Disc' },
       { value: 'none', label: 'None' }
     ];
-    
+
     modes.forEach(mode => {
       const option = document.createElement('option');
       option.value = mode.value;
@@ -931,13 +991,13 @@ export class LyricsUI {
       option.selected = mode.value === currentMode;
       select.appendChild(option);
     });
-    
+
     select.addEventListener('change', (e) => {
       if (onChange) {
         onChange(e.target.value, currentTheme);
       }
     });
-    
+
     container.appendChild(label);
     container.appendChild(select);
     this.controlsContainer.appendChild(container);
@@ -948,7 +1008,7 @@ export class LyricsUI {
    */
   createFullscreenButton(onToggle) {
     if (!this.controlsContainer) return;
-    
+
     const button = document.createElement('button');
     button.textContent = '⛶ Fullscreen';
     Object.assign(button.style, {
@@ -963,23 +1023,23 @@ export class LyricsUI {
       transition: 'all 0.2s',
       flex: '1'
     });
-    
+
     button.addEventListener('mouseenter', () => {
       button.style.background = 'rgba(255, 255, 255, 0.2)';
       button.style.transform = 'scale(1.02)';
     });
-    
+
     button.addEventListener('mouseleave', () => {
       button.style.background = 'rgba(255, 255, 255, 0.1)';
       button.style.transform = 'scale(1)';
     });
-    
+
     button.addEventListener('click', () => {
       if (onToggle) {
         onToggle();
       }
     });
-    
+
     this.controlsContainer.appendChild(button);
   }
 
@@ -989,7 +1049,7 @@ export class LyricsUI {
   createVideoPlayerControls(onFullscreen, onTogglePanel, settings) {
     // Store settings reference for real-time updates
     this.settingsRef = settings;
-    
+
     // Remove existing buttons if present
     const existingContainer = document.querySelector('#lyrics-video-controls-container');
     if (existingContainer) {
@@ -1014,29 +1074,29 @@ export class LyricsUI {
     settingsBtn.setAttribute('aria-label', 'Lyrics Settings');
     settingsBtn.setAttribute('title', 'Lyrics Settings');
     settingsBtn.style.cssText = 'width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none; color: white; opacity: 0.9;';
-    
+
     // Create lyrics note icon SVG
     const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     iconSvg.setAttribute('viewBox', '0 0 24 24');
     iconSvg.setAttribute('fill', 'none');
     iconSvg.style.width = '24px';
     iconSvg.style.height = '24px';
-    
+
     const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     iconPath.setAttribute('d', 'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z');
     iconPath.setAttribute('fill', 'currentColor');
-    
+
     iconSvg.appendChild(iconPath);
     settingsBtn.appendChild(iconSvg);
-    
+
     // Assemble container first so it exists before creating panel
     container.appendChild(settingsBtn);
-    
+
     // Create settings popup panel (pass container to avoid null reference)
     const settingsPanel = this.createSettingsPanel(settings, onFullscreen, onTogglePanel, container);
     settingsPanel.style.display = 'none';
     container.appendChild(settingsPanel);
-    
+
     // Toggle settings panel (track listeners for cleanup)
     this.addListener(settingsBtn, 'click', (e) => {
       e.stopPropagation();
@@ -1064,10 +1124,10 @@ export class LyricsUI {
         settingsBtn.style.opacity = '0.9';
       }
     });
-    
+
     // Insert at the beginning of right controls
     rightControls.insertBefore(container, rightControls.firstChild);
-    
+
     return { settingsBtn, settingsPanel, container };
   }
 
@@ -1091,7 +1151,7 @@ export class LyricsUI {
       font-size: 14px;
       color: #eee;
     `;
-    
+
     // Create menu items
     const menuItems = [
       {
@@ -1227,7 +1287,7 @@ export class LyricsUI {
         }
       }
     ];
-    
+
     menuItems.forEach((item, idx) => {
       if (item.type === 'separator') {
         const separator = document.createElement('div');
@@ -1235,7 +1295,7 @@ export class LyricsUI {
         panel.appendChild(separator);
         return;
       }
-      
+
       const menuItem = document.createElement('div');
       menuItem.setAttribute('data-menu-item', 'true');
       menuItem.style.cssText = `
@@ -1247,27 +1307,27 @@ export class LyricsUI {
         transition: background 0.1s;
         min-height: 40px;
       `;
-      
+
       menuItem.addEventListener('mouseenter', () => {
         menuItem.style.background = 'rgba(255, 255, 255, 0.1)';
       });
-      
+
       menuItem.addEventListener('mouseleave', () => {
         menuItem.style.background = 'transparent';
       });
-      
+
       const label = document.createElement('div');
       label.textContent = item.label;
       label.style.cssText = 'flex: 1; font-size: 13px;';
       menuItem.appendChild(label);
-      
+
       if (item.type === 'button') {
         if (item.checked !== undefined) {
           const checkmark = document.createElement('div');
           checkmark.textContent = '✓';
           checkmark.style.cssText = `font-size: 16px; opacity: ${item.checked ? '1' : '0'};`;
           menuItem.appendChild(checkmark);
-          
+
           menuItem.addEventListener('click', (e) => {
             e.stopPropagation();
             if (item.onClick) item.onClick();
@@ -1283,56 +1343,56 @@ export class LyricsUI {
         menuItem.style.alignItems = 'stretch';
         menuItem.style.cursor = 'default';
         menuItem.style.padding = '12px 16px';
-        
+
         const topRow = document.createElement('div');
         topRow.style.cssText = 'display: flex; justify-content: space-between; margin-bottom: 8px;';
-        
+
         const labelDiv = document.createElement('div');
         labelDiv.textContent = item.label;
         labelDiv.style.fontSize = '13px';
-        
+
         const valueDiv = document.createElement('div');
         valueDiv.textContent = item.currentValue;
         valueDiv.style.cssText = 'font-size: 13px; opacity: 0.6;';
-        
+
         topRow.appendChild(labelDiv);
         topRow.appendChild(valueDiv);
-        
+
         const sliderContainer = document.createElement('div');
         sliderContainer.style.cssText = 'position: relative; height: 4px; background: rgba(255, 255, 255, 0.2); border-radius: 2px;';
-        
+
         const sliderFill = document.createElement('div');
         const percentage = ((item.value - item.min) / (item.max - item.min)) * 100;
         sliderFill.style.cssText = `position: absolute; left: 0; top: 0; height: 100%; width: ${percentage}%; background: #f00; border-radius: 2px;`;
-        
+
         const sliderThumb = document.createElement('div');
         sliderThumb.style.cssText = `position: absolute; top: 50%; left: ${percentage}%; transform: translate(-50%, -50%); width: 12px; height: 12px; background: #f00; border-radius: 50%; cursor: pointer;`;
-        
+
         sliderContainer.appendChild(sliderFill);
         sliderContainer.appendChild(sliderThumb);
-        
+
         let isDragging = false;
         let currentValue = item.value;
-        
+
         sliderThumb.addEventListener('mousedown', (e) => {
           e.stopPropagation();
           isDragging = true;
         });
-        
+
         this.addListener(document, 'mousemove', (e) => {
           if (isDragging) {
             const rect = sliderContainer.getBoundingClientRect();
             let percentage = ((e.clientX - rect.left) / rect.width) * 100;
             percentage = Math.max(0, Math.min(100, percentage));
-            
+
             const value = Math.round(item.min + (percentage / 100) * (item.max - item.min));
             const step = item.step || 1;
             const steppedValue = Math.round(value / step) * step;
-            
+
             const newPercentage = ((steppedValue - item.min) / (item.max - item.min)) * 100;
             sliderFill.style.width = newPercentage + '%';
             sliderThumb.style.left = newPercentage + '%';
-            
+
             // Store current value and only update display text
             currentValue = steppedValue;
             const displayText = item.label.includes('Font') ? steppedValue + 'px' : steppedValue + 'ms';
@@ -1350,41 +1410,41 @@ export class LyricsUI {
             }
           }
         });
-        
+
         sliderContainer.addEventListener('click', (e) => {
           e.stopPropagation();
           const rect = sliderContainer.getBoundingClientRect();
           let percentage = ((e.clientX - rect.left) / rect.width) * 100;
           percentage = Math.max(0, Math.min(100, percentage));
-          
+
           const value = Math.round(item.min + (percentage / 100) * (item.max - item.min));
           const step = item.step || 1;
           const steppedValue = Math.round(value / step) * step;
-          
+
           const newPercentage = ((steppedValue - item.min) / (item.max - item.min)) * 100;
           sliderFill.style.width = newPercentage + '%';
           sliderThumb.style.left = newPercentage + '%';
-          
+
           // Apply immediately on click
           if (item.onChange) {
             const displayValue = item.onChange(steppedValue);
             valueDiv.textContent = displayValue;
           }
         });
-        
+
         menuItem.replaceChildren(topRow, sliderContainer);
       } else if (item.type === 'submenu') {
         const valueDiv = document.createElement('div');
         valueDiv.textContent = item.currentValue;
         valueDiv.style.cssText = 'font-size: 13px; opacity: 0.6; display: flex; align-items: center; gap: 4px;';
-        
+
         const arrow = document.createElement('span');
         arrow.textContent = '›';
         arrow.style.fontSize = '16px';
         valueDiv.appendChild(arrow);
-        
+
         menuItem.appendChild(valueDiv);
-        
+
         menuItem.addEventListener('click', (e) => {
           e.stopPropagation();
           // Create submenu
@@ -1427,10 +1487,10 @@ export class LyricsUI {
           container.appendChild(submenu);
         });
       }
-      
+
       panel.appendChild(menuItem);
     });
-    
+
     return panel;
   }
 
@@ -1453,38 +1513,38 @@ export class LyricsUI {
       font-size: 14px;
       color: #eee;
     `;
-    
+
     // Back button
     const backBtn = document.createElement('div');
     backBtn.style.cssText = 'padding: 8px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid rgba(255, 255, 255, 0.1);';
-    
+
     const backArrow = document.createElement('span');
     backArrow.textContent = '‹';
     backArrow.style.fontSize = '20px';
-    
+
     const backLabel = document.createElement('span');
     backLabel.textContent = title;
     backLabel.style.fontSize = '13px';
-    
+
     backBtn.appendChild(backArrow);
     backBtn.appendChild(backLabel);
-    
+
     backBtn.addEventListener('mouseenter', () => {
       backBtn.style.background = 'rgba(255, 255, 255, 0.1)';
     });
-    
+
     backBtn.addEventListener('mouseleave', () => {
       backBtn.style.background = 'transparent';
     });
-    
+
     backBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       submenu.remove();
       document.querySelector('#lyrics-settings-panel').style.display = 'block';
     });
-    
+
     submenu.appendChild(backBtn);
-    
+
     // Options
     options.forEach(option => {
       const optionItem = document.createElement('div');
@@ -1498,28 +1558,28 @@ export class LyricsUI {
         transition: background 0.1s;
         min-height: 40px;
       `;
-      
+
       const optionLabel = document.createElement('div');
       optionLabel.textContent = option.label;
       optionLabel.style.fontSize = '13px';
-      
+
       const checkmark = document.createElement('div');
       checkmark.textContent = '✓';
       // Use loose equality to handle boolean/string comparisons correctly
       const isSelected = (option.value == selected) || (option.value === selected);
       checkmark.style.cssText = `font-size: 16px; opacity: ${isSelected ? '1' : '0'};`;
-      
+
       optionItem.appendChild(optionLabel);
       optionItem.appendChild(checkmark);
-      
+
       optionItem.addEventListener('mouseenter', () => {
         optionItem.style.background = 'rgba(255, 255, 255, 0.1)';
       });
-      
+
       optionItem.addEventListener('mouseleave', () => {
         optionItem.style.background = 'transparent';
       });
-      
+
       optionItem.addEventListener('click', (e) => {
         e.stopPropagation();
         // Update all checkmarks
@@ -1534,10 +1594,10 @@ export class LyricsUI {
         });
         if (onChange) onChange(option.value);
       });
-      
+
       submenu.appendChild(optionItem);
     });
-    
+
     return submenu;
   }
 
@@ -1598,7 +1658,7 @@ export class LyricsUI {
    */
   updateLyricInContainer(container, index, lyric) {
     if (!container) return;
-    
+
     const lines = container.querySelectorAll('.lyric-line');
     lines.forEach((line, i) => {
       if (i === index) {
@@ -1625,7 +1685,7 @@ export class LyricsUI {
    */
   displayLyricsInContainer(container, lyrics) {
     if (!container) return;
-    
+
     container.replaceChildren();
     const styles = UI_CONFIG.APPLE_MUSIC_STYLE;
 

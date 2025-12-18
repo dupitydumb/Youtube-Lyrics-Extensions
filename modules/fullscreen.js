@@ -8,10 +8,13 @@ export class FullscreenManager {
     this.settings = null;
     this.overlay = null;
     this.lyricsContainer = null;
+    this.metadataOverlay = null;
     this.isActive = false;
     this.keyboardHandler = null;
     this.onExitCallback = null;
     this.highlightMode = 'line'; // 'line' or 'word'
+    this.metadataVisible = true;
+    this.metadataHideTimeout = null;
   }
 
   /**
@@ -24,15 +27,15 @@ export class FullscreenManager {
   /**
    * Enter fullscreen mode
    */
-  enter(lyrics, currentIndex = -1, imageUrl = null, settings = null) {
+  enter(lyrics, currentIndex = -1, imageUrl = null, settings = null, songTitle = '', artistName = '') {
     if (this.isActive) return;
-    
+
     // Store settings for this fullscreen session
     this.settings = settings;
-    
+
     // Create fullscreen overlay
     this.overlay = this.createOverlay();
-    
+
     // Create lyrics container
     this.lyricsContainer = document.createElement('div');
     this.lyricsContainer.id = 'fullscreen-lyrics-container';
@@ -47,7 +50,7 @@ export class FullscreenManager {
       padding: 40px;
       box-sizing: border-box;
     `;
-    
+
     // Hide scrollbar for webkit browsers
     const style = document.createElement('style');
     style.textContent = `
@@ -68,7 +71,7 @@ export class FullscreenManager {
       }
     `;
     this.overlay.appendChild(style);
-    
+
     // Add background
     const bgContainer = document.createElement('div');
     bgContainer.id = 'fullscreen-background';
@@ -81,14 +84,106 @@ export class FullscreenManager {
       z-index: 0;
       overflow: hidden;
     `;
-    
+
     if (this.backgroundManager) {
       this.backgroundManager.updateFullscreenBackground(bgContainer, imageUrl);
     }
-    
+
     this.overlay.appendChild(bgContainer);
-    this.overlay.appendChild(this.lyricsContainer);
-    
+
+    // Create Apple Music-style split layout container
+    const contentContainer = document.createElement('div');
+    contentContainer.style.cssText = `
+      position: relative;
+      z-index: 10;
+      width: 90%;
+      max-width: 1400px;
+      height: 85%;
+      display: flex;
+      gap: 3rem;
+      align-items: center;
+    `;
+
+    // Left Panel: Album art and metadata
+    if (songTitle || artistName || imageUrl) {
+      const leftPanel = document.createElement('div');
+      leftPanel.id = 'fullscreen-left-panel';
+      leftPanel.style.cssText = `
+        flex-shrink: 0;
+        width: 400px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2rem;
+      `;
+
+      // Album cover
+      if (imageUrl) {
+        const albumCover = document.createElement('img');
+        albumCover.src = imageUrl;
+        albumCover.alt = 'Album Cover';
+        albumCover.style.cssText = `
+          width: 350px;
+          height: 350px;
+          object-fit: cover;
+          border-radius: 16px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        `;
+        leftPanel.appendChild(albumCover);
+      }
+
+      // Metadata container
+      const metadataContainer = document.createElement('div');
+      metadataContainer.style.cssText = `
+        width: 100%;
+        text-align: center;
+      `;
+
+      // Song title
+      if (songTitle) {
+        const title = document.createElement('div');
+        title.textContent = songTitle;
+        title.style.cssText = `
+          font-size: 28px;
+          font-weight: 700;
+          color: #ffffff;
+          line-height: 1.3;
+          letter-spacing: -0.02em;
+          margin-bottom: 0.75rem;
+        `;
+        metadataContainer.appendChild(title);
+      }
+
+      // Artist name
+      if (artistName) {
+        const artist = document.createElement('div');
+        artist.textContent = artistName;
+        artist.style.cssText = `
+          font-size: 20px;
+          font-weight: 500;
+          color: rgba(255, 255, 255, 0.7);
+          letter-spacing: 0.02em;
+        `;
+        metadataContainer.appendChild(artist);
+      }
+
+      leftPanel.appendChild(metadataContainer);
+      contentContainer.appendChild(leftPanel);
+    }
+
+    // Right Panel: Lyrics
+    this.lyricsContainer.style.cssText = `
+      flex: 1;
+      height: 100%;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      padding: 40px 20px;
+      box-sizing: border-box;
+    `;
+
+    contentContainer.appendChild(this.lyricsContainer);
+    this.overlay.appendChild(contentContainer);
+
     // Display lyrics in fullscreen container
     if (lyrics && Array.isArray(lyrics)) {
       this.displayLyricsInFullscreen(lyrics);
@@ -101,25 +196,25 @@ export class FullscreenManager {
         });
       }
     }
-    
+
     // Add to DOM
     document.body.appendChild(this.overlay);
-    
+
     // Fade in
     requestAnimationFrame(() => {
       this.overlay.style.opacity = '1';
     });
-    
+
     // Hide YouTube video player
     const moviePlayer = document.querySelector('#movie_player');
     if (moviePlayer) {
       moviePlayer.style.opacity = '0.1';
       moviePlayer.style.pointerEvents = 'none';
     }
-    
+
     // Setup keyboard handler
     this.setupKeyboardHandler();
-    
+
     this.isActive = true;
   }
 
@@ -128,33 +223,40 @@ export class FullscreenManager {
    */
   exit() {
     if (!this.isActive || !this.overlay) return;
-    
+
+    // Cancel metadata auto-hide timeout
+    if (this.metadataHideTimeout) {
+      clearTimeout(this.metadataHideTimeout);
+      this.metadataHideTimeout = null;
+    }
+
     // Fade out
     this.overlay.style.opacity = '0';
-    
+
     setTimeout(() => {
       // Remove from DOM
       if (this.overlay && this.overlay.parentNode) {
         this.overlay.parentNode.removeChild(this.overlay);
       }
-      
+
       // Restore YouTube video player
       const moviePlayer = document.querySelector('#movie_player');
       if (moviePlayer) {
         moviePlayer.style.opacity = '1';
         moviePlayer.style.pointerEvents = 'auto';
       }
-      
+
       // Remove keyboard handler
       if (this.keyboardHandler) {
         document.removeEventListener('keydown', this.keyboardHandler);
         this.keyboardHandler = null;
       }
-      
+
       this.overlay = null;
       this.lyricsContainer = null;
+      this.metadataOverlay = null;
       this.isActive = false;
-      
+
       // Call exit callback if set
       if (this.onExitCallback) {
         this.onExitCallback();
@@ -193,7 +295,7 @@ export class FullscreenManager {
       opacity: 0;
       transition: opacity 0.3s ease-in-out;
     `;
-    
+
     return overlay;
   }
 
@@ -217,7 +319,7 @@ export class FullscreenManager {
         }
       }
     };
-    
+
     document.addEventListener('keydown', this.keyboardHandler);
   }
 
@@ -240,7 +342,7 @@ export class FullscreenManager {
    */
   updateBackground(imageUrl) {
     if (!this.isActive) return;
-    
+
     const bgContainer = document.getElementById('fullscreen-background');
     if (bgContainer && this.backgroundManager) {
       this.backgroundManager.updateFullscreenBackground(bgContainer, imageUrl);
@@ -252,16 +354,16 @@ export class FullscreenManager {
    */
   displayLyricsInFullscreen(lyrics) {
     if (!this.lyricsContainer) return;
-    
+
     // Clear cache when displaying new lyrics
     this._cachedFullscreenLines = null;
-    
+
     this.lyricsContainer.replaceChildren();
-    
+
     // Create wrapper for proper centering and scrolling
     const wrapper = document.createElement('div');
     wrapper.id = 'fullscreen-lyrics-wrapper';
-    
+
 
     lyrics.forEach((lyric, index) => {
       const lyricLine = document.createElement('div');
@@ -386,7 +488,7 @@ export class FullscreenManager {
 
       wrapper.appendChild(lyricLine);
     });
-    
+
     this.lyricsContainer.appendChild(wrapper);
   }
 
@@ -400,7 +502,7 @@ export class FullscreenManager {
     if (indexChanged || !this._cachedFullscreenLines) {
       this._cachedFullscreenLines = this.lyricsContainer.querySelectorAll('.fullscreen-lyric-line');
     }
-    
+
     const lyricLines = this._cachedFullscreenLines;
 
     // Batch DOM updates in RAF for smoothness
@@ -413,7 +515,7 @@ export class FullscreenManager {
           if (isCurrent) {
             line.classList.add('current');
             line.classList.remove('past', 'future');
-            
+
             // Use Object.assign instead of cssText to preserve inheritance
             Object.assign(line.style, {
               color: '#ffffff',
@@ -434,20 +536,20 @@ export class FullscreenManager {
             try {
               line.style.setProperty('color', '#ffffff', 'important');
               line.style.setProperty('opacity', '1', 'important');
-            } catch (e) {}
+            } catch (e) { }
 
             // Ensure inner elements (original text and romanization) are fully visible
             const orig = line.querySelector('.fullscreen-original-text');
             if (orig) {
               orig.style.color = '#ffffff';
               orig.style.opacity = '1';
-              try { orig.style.setProperty('color', '#ffffff', 'important'); orig.style.setProperty('opacity', '1', 'important'); } catch(e) {}
+              try { orig.style.setProperty('color', '#ffffff', 'important'); orig.style.setProperty('opacity', '1', 'important'); } catch (e) { }
             }
             const romanElems = line.querySelectorAll('.fullscreen-romanization, .word-romanization');
             romanElems.forEach(el => {
               el.style.color = '#ffffff';
               el.style.opacity = '1';
-              try { el.style.setProperty('color', '#ffffff', 'important'); el.style.setProperty('opacity', '1', 'important'); } catch(e) {}
+              try { el.style.setProperty('color', '#ffffff', 'important'); el.style.setProperty('opacity', '1', 'important'); } catch (e) { }
             });
             const wordSpans = line.querySelectorAll('.lyric-word');
             wordSpans.forEach(w => {
@@ -455,7 +557,7 @@ export class FullscreenManager {
               w.style.fontWeight = '600';
               w.style.transform = 'scale(1)';
               w.style.textShadow = '0 2px 12px rgba(255,255,255,0.25)';
-              try { w.style.setProperty('color', '#ffffff', 'important'); w.style.setProperty('opacity', '1', 'important'); } catch(e) {}
+              try { w.style.setProperty('color', '#ffffff', 'important'); w.style.setProperty('opacity', '1', 'important'); } catch (e) { }
             });
 
             // Debounced scroll - only on index change
@@ -463,12 +565,12 @@ export class FullscreenManager {
               const containerRect = this.lyricsContainer.getBoundingClientRect();
               const lineRect = line.getBoundingClientRect();
               const containerScrollTop = this.lyricsContainer.scrollTop;
-              
+
               const lineRelativeTop = lineRect.top - containerRect.top + containerScrollTop;
               const containerHeight = this.lyricsContainer.clientHeight;
               const lineHeight = line.offsetHeight;
               const scrollPosition = lineRelativeTop - (containerHeight / 2) + (lineHeight / 2);
-              
+
               this.lyricsContainer.scrollTo({
                 top: scrollPosition,
                 behavior: 'smooth'
@@ -483,9 +585,9 @@ export class FullscreenManager {
               line.classList.add('future');
               line.classList.remove('past');
             }
-            
+
             const fadedColor = isPast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.5)';
-            
+
             Object.assign(line.style, {
               fontSize: '32px',
               fontWeight: '400',
@@ -518,7 +620,7 @@ export class FullscreenManager {
         });
       });
     }
-    
+
     // Word-level updates (happens every frame for word mode)
     if (currentTime !== null && this.highlightMode === 'word') {
       const currentLine = lyricLines[currentIndex];
@@ -526,10 +628,10 @@ export class FullscreenManager {
         const words = currentLine.querySelectorAll('.lyric-word');
         words.forEach(word => {
           const wordTime = parseFloat(word.dataset.wordTime);
-          
+
           if (!isNaN(wordTime)) {
             const timeDiff = currentTime - wordTime;
-            
+
             if (timeDiff >= 0 && timeDiff < 0.3) {
               word.style.color = '#ffffff';
               word.style.textShadow = '0 2px 12px rgba(255, 255, 255, 0.3)';
@@ -549,6 +651,148 @@ export class FullscreenManager {
           }
         });
       }
+    }
+  }
+
+  /**
+   * Create metadata overlay with album cover, song title, and artist name
+   */
+  createMetadataOverlay(imageUrl, songTitle, artistName) {
+    const overlay = document.createElement('div');
+    overlay.id = 'fullscreen-metadata-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 2rem;
+      right: 2rem;
+      z-index: 999999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.5rem;
+      background: rgba(20, 20, 25, 0.85);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      max-width: 250px;
+      opacity: 1;
+      transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transform: translateY(0);
+    `;
+
+    // Album cover
+    if (imageUrl) {
+      const albumCover = document.createElement('img');
+      albumCover.src = imageUrl;
+      albumCover.alt = 'Album Cover';
+      albumCover.style.cssText = `
+        width: 180px;
+        height: 180px;
+        object-fit: cover;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      `;
+      overlay.appendChild(albumCover);
+    }
+
+    // Song info container
+    const songInfo = document.createElement('div');
+    songInfo.style.cssText = `
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+    `;
+
+    // Song title
+    if (songTitle) {
+      const title = document.createElement('div');
+      title.textContent = songTitle;
+      title.style.cssText = `
+        font-size: 18px;
+        font-weight: 700;
+        color: #ffffff;
+        text-align: center;
+        line-height: 1.3;
+        letter-spacing: -0.02em;
+      `;
+      songInfo.appendChild(title);
+    }
+
+    // Artist name
+    if (artistName) {
+      const artist = document.createElement('div');
+      artist.textContent = artistName;
+      artist.style.cssText = `
+        font-size: 14px;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.65);
+        text-align: center;
+        letter-spacing: 0.02em;
+      `;
+      songInfo.appendChild(artist);
+    }
+
+    overlay.appendChild(songInfo);
+    return overlay;
+  }
+
+  /**
+   * Toggle metadata overlay visibility
+   */
+  toggleMetadataVisibility() {
+    if (!this.metadataOverlay) return;
+
+    this.metadataVisible = !this.metadataVisible;
+
+    if (this.metadataVisible) {
+      this.metadataOverlay.style.opacity = '1';
+      this.metadataOverlay.style.transform = 'translateY(0)';
+      this.metadataOverlay.style.pointerEvents = 'auto';
+    } else {
+      this.metadataOverlay.style.opacity = '0';
+      this.metadataOverlay.style.transform = 'translateY(-20px)';
+      this.metadataOverlay.style.pointerEvents = 'none';
+    }
+
+    // Cancel auto-hide if user manually toggles
+    if (this.metadataHideTimeout) {
+      clearTimeout(this.metadataHideTimeout);
+      this.metadataHideTimeout = null;
+    }
+  }
+
+  /**
+   * Schedule metadata overlay to auto-hide after specified delay
+   */
+  scheduleMetadataAutoHide(delaySeconds) {
+    // Clear existing timeout
+    if (this.metadataHideTimeout) {
+      clearTimeout(this.metadataHideTimeout);
+    }
+
+    // Schedule new timeout
+    this.metadataHideTimeout = setTimeout(() => {
+      if (this.metadataOverlay && this.metadataVisible) {
+        this.metadataVisible = false;
+        this.metadataOverlay.style.opacity = '0';
+        this.metadataOverlay.style.transform = 'translateY(-20px)';
+        this.metadataOverlay.style.pointerEvents = 'none';
+      }
+      this.metadataHideTimeout = null;
+    }, delaySeconds * 1000);
+  }
+
+  /**
+   * Cancel metadata auto-hide
+   */
+  cancelMetadataAutoHide() {
+    if (this.metadataHideTimeout) {
+      clearTimeout(this.metadataHideTimeout);
+      this.metadataHideTimeout = null;
     }
   }
 }
