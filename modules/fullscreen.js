@@ -376,12 +376,13 @@ export class FullscreenManager {
         fontSize: '32px',
         lineHeight: '1.8',
         color: 'rgba(255, 255, 255, 0.5)',
-        transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease',
+        transition: 'all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
         transform: 'translateZ(0)',
         fontWeight: '400',
         textAlign: 'center',
         cursor: 'pointer',
-        willChange: 'font-size, color'
+        willChange: 'font-size, color, filter, transform',
+        filter: 'blur(1.2px)' // Future lines start blurred
       });
 
       // Word-level timing: render each word and optional per-word romanization
@@ -403,8 +404,10 @@ export class FullscreenManager {
           Object.assign(wordSpan.style, {
             display: 'inline-block',
             color: 'rgba(255,255,255,0.95)',
-            transition: 'color 0.15s ease, transform 0.15s ease',
-            fontWeight: '400'
+            transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            fontWeight: '400',
+            transform: 'translateZ(0)',
+            willChange: 'transform, color, filter'
           });
 
           wrapper.appendChild(wordSpan);
@@ -516,6 +519,13 @@ export class FullscreenManager {
             line.classList.add('current');
             line.classList.remove('past', 'future');
 
+            // Remove any previous animation classes
+            line.style.animation = 'none';
+            // Trigger reflow to restart animation
+            void line.offsetWidth;
+            // Apply Apple Music-style bounce animation
+            line.style.animation = 'lyric-bounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+
             // Use Object.assign instead of cssText to preserve inheritance
             Object.assign(line.style, {
               color: '#ffffff',
@@ -527,9 +537,10 @@ export class FullscreenManager {
               lineHeight: '1.8',
               textAlign: 'center',
               cursor: 'pointer',
-              transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease, text-shadow 0.3s ease',
+              transition: 'all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease',
               opacity: '1',
-              willChange: 'font-size, color'
+              willChange: 'font-size, color, filter, transform',
+              filter: 'blur(0px)', // Remove blur for current line
             });
 
             // Force bright, fully opaque color to override page/global CSS
@@ -555,8 +566,9 @@ export class FullscreenManager {
             wordSpans.forEach(w => {
               w.style.color = '#ffffff';
               w.style.fontWeight = '600';
-              w.style.transform = 'scale(1)';
+              w.style.transform = 'scale(1) translateZ(0)';
               w.style.textShadow = '0 2px 12px rgba(255,255,255,0.25)';
+              w.style.filter = 'blur(0px)';
               try { w.style.setProperty('color', '#ffffff', 'important'); w.style.setProperty('opacity', '1', 'important'); } catch (e) { }
             });
 
@@ -587,6 +599,7 @@ export class FullscreenManager {
             }
 
             const fadedColor = isPast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.5)';
+            const blurAmount = isPast ? '0.8px' : '1.2px';
 
             Object.assign(line.style, {
               fontSize: '32px',
@@ -594,8 +607,10 @@ export class FullscreenManager {
               transform: 'translateZ(0)',
               textShadow: 'none',
               color: fadedColor,
-              transition: 'font-size 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s ease',
-              willChange: 'font-size, color'
+              transition: 'all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.4s ease',
+              willChange: 'font-size, color, filter',
+              filter: `blur(${blurAmount})`, // Apply blur to past/future lines
+              animation: 'none'
             });
 
             // Dim inner elements for non-current lines
@@ -613,8 +628,10 @@ export class FullscreenManager {
             wordSpans2.forEach(w => {
               w.style.color = 'rgba(255,255,255,0.6)';
               w.style.fontWeight = '400';
-              w.style.transform = 'scale(1)';
+              w.style.transform = 'scale(1) translateZ(0)';
               w.style.textShadow = 'none';
+              w.style.filter = 'blur(0px)';
+              w.style.animation = 'none';
             });
           }
         });
@@ -626,27 +643,52 @@ export class FullscreenManager {
       const currentLine = lyricLines[currentIndex];
       if (currentLine) {
         const words = currentLine.querySelectorAll('.lyric-word');
-        words.forEach(word => {
+        words.forEach((word, wordIndex) => {
           const wordTime = parseFloat(word.dataset.wordTime);
 
           if (!isNaN(wordTime)) {
             const timeDiff = currentTime - wordTime;
+            const staggerDelay = Math.min(wordIndex * 0.05, 0.3); // Max 300ms stagger
 
+            // Active word - spring animation with glow
             if (timeDiff >= 0 && timeDiff < 0.3) {
+              // Reset and trigger spring animation
+              word.style.animation = 'none';
+              void word.offsetWidth; // Trigger reflow
+              word.style.animation = `word-spring-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) ${staggerDelay}s`;
+
+              word.style.color = '#ffffff';
+              word.style.textShadow = '0 0 20px rgba(255, 255, 255, 0.6), 0 0 40px rgba(255, 255, 255, 0.3)';
+              word.style.transform = 'scale(1.08) translateY(-1px) translateZ(0)';
+              word.style.fontWeight = '700';
+              word.style.filter = 'blur(0px)';
+
+              // Held word - add bounce animation
+            } else if (timeDiff >= 0.3 && timeDiff < 1.0) {
+              word.style.animation = 'word-bounce 0.6s ease-in-out infinite';
               word.style.color = '#ffffff';
               word.style.textShadow = '0 2px 12px rgba(255, 255, 255, 0.3)';
-              word.style.transform = 'scale(1.05)';
+              word.style.transform = 'scale(1.08) translateZ(0)';
               word.style.fontWeight = '600';
-            } else if (timeDiff >= 0.3) {
+              word.style.filter = 'blur(0px)';
+
+              // Past word
+            } else if (timeDiff >= 1.0) {
+              word.style.animation = 'none';
               word.style.color = 'rgba(255, 255, 255, 0.5)';
               word.style.textShadow = 'none';
-              word.style.transform = 'scale(1)';
+              word.style.transform = 'scale(1) translateZ(0)';
               word.style.fontWeight = '400';
+              word.style.filter = 'blur(0px)';
+
+              // Future word
             } else {
+              word.style.animation = 'none';
               word.style.color = 'rgba(255, 255, 255, 0.3)';
               word.style.textShadow = 'none';
-              word.style.transform = 'scale(1)';
+              word.style.transform = 'scale(1) translateZ(0)';
               word.style.fontWeight = '400';
+              word.style.filter = 'blur(0px)';
             }
           }
         });

@@ -24,6 +24,53 @@ export class LyricsUI {
     this._rafId = null;
     this._visibleRange = { start: -1, end: -1 };
     this._lastWordIndexMap = new Map();
+    // Scroll system - prevent jitter
+    this._lastScrollIndex = -1;
+    this._isScrolling = false;
+    this._scrollAnimationId = null;
+  }
+
+  /**
+   * Custom smooth scroll with easing to prevent jitter
+   * @param {number} targetPosition - Target scroll position
+   * @param {number} duration - Animation duration in ms
+   */
+  smoothScrollTo(targetPosition, duration = 350) {
+    if (!this.lyricsContainer || this._isScrolling) return;
+
+    const startPosition = this.lyricsContainer.scrollTop;
+    const distance = targetPosition - startPosition;
+
+    // Skip if already close enough
+    if (Math.abs(distance) < 5) return;
+
+    this._isScrolling = true;
+    const startTime = performance.now();
+
+    // Easing function - easeOutCubic for smooth deceleration
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+    const animateScroll = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = easeOutCubic(progress);
+
+      this.lyricsContainer.scrollTop = startPosition + (distance * easeProgress);
+
+      if (progress < 1) {
+        this._scrollAnimationId = requestAnimationFrame(animateScroll);
+      } else {
+        this._isScrolling = false;
+        this._scrollAnimationId = null;
+      }
+    };
+
+    // Cancel any existing scroll animation
+    if (this._scrollAnimationId) {
+      cancelAnimationFrame(this._scrollAnimationId);
+    }
+
+    this._scrollAnimationId = requestAnimationFrame(animateScroll);
   }
 
   /**
@@ -42,7 +89,8 @@ export class LyricsUI {
   }
 
   /**
-   * Perform the actual DOM updates — optimized to only touch visible lines
+   * Perform the actual DOM updates — simplified 3-line display
+   * Shows only: previous, current, and next lyrics
    */
   performUpdate(currentIndex, currentTime = null, indexChanged = true) {
     if (!this.lyricsContainer) return;
@@ -55,136 +103,49 @@ export class LyricsUI {
     const total = lyricLines.length;
     if (total === 0) return;
 
-    // Compute visible window: current +-2
-    const newStart = Math.max(0, currentIndex - 2);
-    const newEnd = Math.min(total - 1, currentIndex + 2);
+    // Define position class constants
+    const CLASSES = ['lyric-prev', 'lyric-current', 'lyric-next', 'lyric-exit', 'lyric-enter'];
 
-    // Hide previously visible lines that are now outside new range
-    if (this._visibleRange.start !== -1) {
-      for (let i = this._visibleRange.start; i <= this._visibleRange.end; i++) {
-        if (i < newStart || i > newEnd) {
-          const line = lyricLines[i];
-          if (line) line.style.display = 'none';
-        }
-      }
-    }
+    // Calculate indices for 3-line display
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : -1;
+    const nextIndex = currentIndex < total - 1 ? currentIndex + 1 : -1;
 
-    // Update only lines within new visible range
-    for (let i = newStart; i <= newEnd; i++) {
+    // Update all lines - remove old classes and apply new ones
+    for (let i = 0; i < total; i++) {
       const line = lyricLines[i];
       if (!line) continue;
 
-      const isCurrent = i === currentIndex;
-      const isPast = i < currentIndex;
+      // Remove all position classes first
+      line.classList.remove(...CLASSES, 'current', 'past', 'future');
 
-      line.style.display = 'block';
+      // Apply appropriate position class
+      if (i === prevIndex) {
+        line.classList.add('lyric-prev');
+      } else if (i === currentIndex) {
+        line.classList.add('lyric-current');
 
-      if (isCurrent) {
-        line.classList.add('current');
-        // Apply Apple Music-style current line styling
-        try {
-          line.style.setProperty('color', '#ffffff', 'important');
-          line.style.setProperty('opacity', '1', 'important');
-        } catch (e) { }
-
-        // Dynamic scale based on text length for better readability
-        const textLength = line.textContent.length;
-        const baseScale = 1.6;
-        let scale;
-        if (textLength > 100) scale = 1.25;
-        else if (textLength > 60) scale = 1.4;
-        else scale = baseScale;
-
-        // Calculate extra space needed for scaling to prevent jitter
-        // Use padding instead of margin for consistent spacing
-        const extraSpace = (scale - 1) * 10; // rough approximation
-
-        Object.assign(line.style, {
-          fontWeight: '700',
-          fontSize: '20px',
-          transform: `translateZ(0) scale(${scale})`,
-          transformOrigin: 'center center',
-          textShadow: '0 0 30px rgba(255, 255, 255, 0.4), 0 0 60px rgba(255, 255, 255, 0.2), 0 2px 20px rgba(255, 255, 255, 0.3)',
-          padding: `${12 + extraSpace}px 40px`,
-          margin: '8px 0',  // Consistent margin
-          letterSpacing: '-0.01em',
-          transition: 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          background: 'linear-gradient(90deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.9) 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          minHeight: '60px',  // Reserve space to prevent jumping
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        });
-
-        // Word highlighting handling
+        // Handle word highlighting for current line
         const wordsOnLine = line.querySelectorAll('.lyric-word');
         wordsOnLine.forEach(w => {
           w.classList.remove('future', 'past');
-          if (this.highlightMode === 'line') w.classList.add('highlighted');
-          else w.classList.remove('highlighted');
-          try { w.style.setProperty('color', '#ffffff', 'important'); w.style.setProperty('opacity', '1', 'important'); } catch (e) { }
-        });
-
-        // Debounced smooth scroll
-        if (!this._scrollTimeout) {
-          const containerHeight = this.lyricsContainer.clientHeight;
-          const lineTop = line.offsetTop;
-          const lineHeight = line.offsetHeight;
-          const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
-          this.lyricsContainer.scrollTo({ top: scrollPosition, behavior: 'smooth' });
-        }
-      } else {
-        line.classList.remove('current');
-
-        // Differentiate past and future with subtle animations
-        const fadedOpacity = isPast ? '0.6' : '0.8';
-        const fadedColor = isPast ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.35)';
-        const transformValue = isPast ? 'translateZ(0) scale(0.96)' : 'translateZ(0) scale(1)';
-
-        Object.assign(line.style, {
-          fontWeight: '400',
-          fontSize: '17px',
-          transform: transformValue,
-          transformOrigin: 'center center',
-          textShadow: 'none',
-          padding: '16px 40px',  // Consistent padding
-          margin: '8px 0',  // Consistent margin - same as current
-          letterSpacing: '0.01em',
-          opacity: fadedOpacity,
-          color: fadedColor,
-          transition: 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          background: 'none',
-          WebkitTextFillColor: 'inherit',
-          backgroundClip: 'border-box',
-          minHeight: '60px',  // Same min height as current
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        });
-
-        // Reset word highlighting for non-current lines
-        const words = line.querySelectorAll('.lyric-word');
-        words.forEach(word => {
-          word.classList.remove('highlighted');
-          if (isPast) {
-            word.classList.remove('future');
-            word.classList.add('past');
+          if (this.highlightMode === 'line') {
+            w.classList.add('highlighted');
           } else {
-            word.classList.remove('past');
-            word.classList.add('future');
+            w.classList.remove('highlighted');
           }
         });
+      } else if (i === nextIndex) {
+        line.classList.add('lyric-next');
       }
+      // Lines outside prev/current/next remain hidden (no class = invisible via CSS)
     }
 
-    this._visibleRange.start = newStart;
-    this._visibleRange.end = newEnd;
+    // Update visible range tracking
+    this._visibleRange.start = Math.max(0, currentIndex - 1);
+    this._visibleRange.end = Math.min(total - 1, currentIndex + 1);
 
     // Word-level updates for current line
-    if (currentTime !== null) {
+    if (currentTime !== null && this.highlightMode === 'word') {
       const currentLine = lyricLines[currentIndex];
       if (currentLine) this.updateWordHighlight(currentLine, currentTime);
     }
@@ -290,78 +251,81 @@ export class LyricsUI {
   }
 
   /**
-   * Apply lyrics container styles
+   * Apply lyrics container styles - 3-line display
    */
   applyLyricsContainerStyles(element) {
-    const styles = UI_CONFIG.APPLE_MUSIC_STYLE;
     Object.assign(element.style, {
       flex: '1',
-      overflowY: 'auto',
-      overflowX: 'visible',
-      padding: '20px 40px',
+      overflow: 'hidden',
+      padding: '1.5rem 1rem',
       textAlign: 'center',
-      scrollBehavior: 'smooth',
-      maskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%)',
-      WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%)'
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '180px',
+      maxHeight: '220px',
+      position: 'relative'
     });
 
-    // Custom scrollbar and word highlighting styles
+    // 3-line display styles with !important to override conflicts
     const style = document.createElement('style');
     style.textContent = `
-      #lyrics-display::-webkit-scrollbar {
-        display: none;
-      }
+      /* ===== 3-LINE DISPLAY SYSTEM ===== */
       
-      #lyrics-display {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      
-      /* Ensure title and artist remain visible */
-      #song-title, #song-artist {
-        opacity: 1 !important;
-        visibility: visible !important;
-      }
-      
-      /* Word-by-word highlighting with smooth animations */
-      .lyric-word {
-        display: inline-block;
-        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        margin: 0 3px;
-      }
-      
-      .lyric-word.highlighted {
-        color: #ffffff !important;
-        text-shadow: 0 0 20px rgba(255, 255, 255, 0.6), 0 0 40px rgba(255, 255, 255, 0.3);
-        transform: scale(1.08);
-        font-weight: 700;
-      }
-      
-      .lyric-word.past {
+      /* Base line - hidden by default */
+      #lyrics-display .lyric-line {
+        position: absolute !important;
+        left: 50% !important;
+        transform: translateX(-50%) translateY(100px) !important;
+        opacity: 0 !important;
+        padding: 0.5rem 1.5rem !important;
+        font-size: 1rem !important;
+        font-weight: 400 !important;
         color: rgba(255, 255, 255, 0.5) !important;
-        font-weight: 500;
+        max-width: 95% !important;
+        text-align: center !important;
+        pointer-events: none !important;
+        transition: transform 0.4s ease, opacity 0.4s ease, font-size 0.4s ease, color 0.3s ease !important;
       }
       
-      .lyric-word.future {
-        color: rgba(255, 255, 255, 0.35) !important;
+      /* PREVIOUS LINE - top */
+      #lyrics-display .lyric-line.lyric-prev {
+        transform: translateX(-50%) translateY(-50px) !important;
+        opacity: 0.5 !important;
+        font-size: 0.95rem !important;
+        color: rgba(255, 255, 255, 0.45) !important;
+        pointer-events: auto !important;
       }
       
-      /* Gradient text effect for current line - Apple Music style */
-      .lyric-line.current-gradient {
-        background: linear-gradient(90deg, 
-          rgba(255, 255, 255, 0.85) 0%,
-          rgba(255, 255, 255, 1) 50%,
-          rgba(255, 255, 255, 0.85) 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        animation: gradientShift 3s ease-in-out infinite;
+      /* CURRENT LINE - center */
+      #lyrics-display .lyric-line.lyric-current {
+        transform: translateX(-50%) translateY(0) !important;
+        opacity: 1 !important;
+        font-size: 1.25rem !important;
+        font-weight: 700 !important;
+        color: #ffffff !important;
+        text-shadow: 0 0 20px rgba(255, 255, 255, 0.4) !important;
+        pointer-events: auto !important;
       }
       
-      @keyframes gradientShift {
-        0%, 100% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
+      /* NEXT LINE - bottom */
+      #lyrics-display .lyric-line.lyric-next {
+        transform: translateX(-50%) translateY(50px) !important;
+        opacity: 0.5 !important;
+        font-size: 0.95rem !important;
+        color: rgba(255, 255, 255, 0.45) !important;
+        pointer-events: auto !important;
       }
+      
+      /* Word highlighting */
+      .lyric-word { display: inline; transition: color 0.25s ease; }
+      .lyric-word.highlighted { color: #ffffff !important; font-weight: 700 !important; }
+      .lyric-word.past { color: rgba(255, 255, 255, 0.6) !important; }
+      .lyric-word.future { color: rgba(255, 255, 255, 0.35) !important; }
+      
+      /* Title visibility */
+      #song-title, #song-artist { opacity: 1 !important; visibility: visible !important; }
     `;
     // Store injected style element so it can be removed on cleanup
     this._lyricsStyleElement = style;
@@ -546,7 +510,7 @@ export class LyricsUI {
         roman.className = 'romanization-text';
         roman.textContent = lyric.romanized;
         Object.assign(roman.style, {
-          marginTop: '6px',
+          marginTop: '4px',
           fontSize: shouldHideOriginal ? '1em' : '0.85em',
           color: 'inherit',
           fontStyle: 'italic'
@@ -554,26 +518,8 @@ export class LyricsUI {
         lyricLine.appendChild(roman);
       }
 
-      Object.assign(lyricLine.style, {
-        padding: '16px 40px',
-        fontSize: '17px',
-        lineHeight: '1.6',
-        color: 'rgba(255, 255, 255, 0.35)',
-        cursor: 'pointer',
-        transition: 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-        transform: 'scale(1) translateY(0)',
-        fontWeight: '400',
-        maxWidth: '100%',
-        width: '100%',
-        margin: '2px 0',
-        wordWrap: 'break-word',
-        overflowWrap: 'break-word',
-        whiteSpace: 'pre-wrap',
-        boxSizing: 'border-box',
-        textAlign: 'center',
-        opacity: '0.8',
-        letterSpacing: '0.01em'
-      });
+      // NO inline styles - let CSS handle everything
+      // Just add class and data attributes
 
       // Click to seek
       lyricLine.addEventListener('click', () => {
@@ -581,23 +527,6 @@ export class LyricsUI {
           detail: { index, time: lyric.time }
         });
         document.dispatchEvent(event);
-      });
-
-      // Enhanced hover effect with smooth transitions
-      lyricLine.addEventListener('mouseenter', () => {
-        if (!lyricLine.classList.contains('current')) {
-          lyricLine.style.color = 'rgba(255, 255, 255, 0.7)';
-          lyricLine.style.transform = 'scale(1.02) translateY(-1px)';
-          lyricLine.style.opacity = '1';
-        }
-      });
-
-      lyricLine.addEventListener('mouseleave', () => {
-        if (!lyricLine.classList.contains('current')) {
-          lyricLine.style.color = 'rgba(255, 255, 255, 0.35)';
-          lyricLine.style.transform = 'scale(1) translateY(0)';
-          lyricLine.style.opacity = '0.8';
-        }
       });
 
       this.lyricsContainer.appendChild(lyricLine);
