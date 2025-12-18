@@ -95,19 +95,28 @@ export class LyricsUI {
         else if (textLength > 60) scale = 1.4;
         else scale = baseScale;
 
+        // Calculate extra space needed for scaling to prevent jitter
+        // Use padding instead of margin for consistent spacing
+        const extraSpace = (scale - 1) * 10; // rough approximation
+
         Object.assign(line.style, {
           fontWeight: '700',
           fontSize: '20px',
-          transform: `translateZ(0) scale(${scale}) translateY(0)`,
-          transformOrigin: 'center',
+          transform: `translateZ(0) scale(${scale})`,
+          transformOrigin: 'center center',
           textShadow: '0 0 30px rgba(255, 255, 255, 0.4), 0 0 60px rgba(255, 255, 255, 0.2), 0 2px 20px rgba(255, 255, 255, 0.3)',
-          margin: '24px 0',
+          padding: `${12 + extraSpace}px 40px`,
+          margin: '8px 0',  // Consistent margin
           letterSpacing: '-0.01em',
-          transition: 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), margin 0.5s ease',
+          transition: 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
           background: 'linear-gradient(90deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.9) 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text'
+          backgroundClip: 'text',
+          minHeight: '60px',  // Reserve space to prevent jumping
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         });
 
         // Word highlighting handling
@@ -133,22 +142,27 @@ export class LyricsUI {
         // Differentiate past and future with subtle animations
         const fadedOpacity = isPast ? '0.6' : '0.8';
         const fadedColor = isPast ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.35)';
-        const transformValue = isPast ? 'translateZ(0) scale(0.96) translateY(0)' : 'translateZ(0) scale(1) translateY(0)';
+        const transformValue = isPast ? 'translateZ(0) scale(0.96)' : 'translateZ(0) scale(1)';
 
         Object.assign(line.style, {
           fontWeight: '400',
           fontSize: '17px',
           transform: transformValue,
-          transformOrigin: 'center',
+          transformOrigin: 'center center',
           textShadow: 'none',
-          margin: '2px 0',
+          padding: '16px 40px',  // Consistent padding
+          margin: '8px 0',  // Consistent margin - same as current
           letterSpacing: '0.01em',
           opacity: fadedOpacity,
           color: fadedColor,
           transition: 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
           background: 'none',
           WebkitTextFillColor: 'inherit',
-          backgroundClip: 'border-box'
+          backgroundClip: 'border-box',
+          minHeight: '60px',  // Same min height as current
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         });
 
         // Reset word highlighting for non-current lines
