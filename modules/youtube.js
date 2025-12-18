@@ -11,7 +11,7 @@ export class YouTubeIntegration {
       VIDEO_PLAYER: 'video',
       TITLE_CONTAINER: '#title'
     };
-    
+
     this.currentUrl = '';
     this.currentVideoId = '';
     this.currentTitle = '';
@@ -58,14 +58,14 @@ export class YouTubeIntegration {
     try {
       const videoId = this.getVideoId();
       if (!videoId) return null;
-      
+
       // Try high quality thumbnails in order
       const thumbnailUrls = [
         `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
         `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
         `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
       ];
-      
+
       for (const url of thumbnailUrls) {
         try {
           const response = await fetch(url);
@@ -76,7 +76,7 @@ export class YouTubeIntegration {
           continue;
         }
       }
-      
+
       return null;
     } catch (error) {
       return null;
@@ -103,17 +103,17 @@ export class YouTubeIntegration {
    */
   formatTitle(title, filterWords) {
     if (!title) return '';
-    
+
     const NOT_ALLOWED = new Set([...filterWords.BASIC]);
-    
+
     let formatted = title.toLowerCase().split(' ')
       .filter(word => !NOT_ALLOWED.has(word))
       .join(' ');
-    
+
     if (formatted.includes('|') && formatted.includes('-')) {
       formatted = formatted.split('|')[0];
     }
-    
+
     return formatted.trim();
   }
 
@@ -122,19 +122,19 @@ export class YouTubeIntegration {
    */
   formatSongOnly(title, filterWords) {
     if (!title) return '';
-    
+
     let formatted = title.toLowerCase().split(' ')
-      .filter(word => 
-        !filterWords.EXTENDED.map(w => w.toLowerCase()).includes(word) && 
+      .filter(word =>
+        !filterWords.EXTENDED.map(w => w.toLowerCase()).includes(word) &&
         !/[\uAC00-\uD7AF]/.test(word)
       )
       .join(' ');
-    
+
     formatted = formatted.split('|')[0];
     formatted = formatted.replace(/\[.*?\]/g, '');
     formatted = formatted.replace(/\(.*?\)/g, '');
     formatted = formatted.replace(/''/g, '').replace(/"/g, '');
-    
+
     return formatted.trim();
   }
 
@@ -143,7 +143,7 @@ export class YouTubeIntegration {
    */
   watchNavigation(callback) {
     this.onNavigateCallback = callback;
-    
+
     // Debounce helper
     const debounce = (func, wait) => {
       let timeout;
@@ -162,7 +162,7 @@ export class YouTubeIntegration {
     this._handleUrlChange = debounce(() => {
       const currentUrl = window.location.href;
       const currentVideoId = this.getVideoId();
-      
+
       if (this.isVideoPage()) {
         // Check both URL and video ID to catch all navigation types
         if (currentUrl !== this.currentUrl || currentVideoId !== this.currentVideoId) {
@@ -190,7 +190,7 @@ export class YouTubeIntegration {
 
     // Create title observer
     this.titleObserver = new MutationObserver(this._handleTitleChange);
-    
+
     const titleContainer = document.querySelector(this.selectors.TITLE_CONTAINER);
     if (titleContainer) {
       this.titleObserver.observe(titleContainer, { childList: true, subtree: true });
@@ -241,9 +241,18 @@ export class YouTubeIntegration {
           await this.waitForElement(this.selectors.SECONDARY_INNER, 5000);
           // Wait for title to actually change to the new video
           await this.waitForTitleChange(3000);
+
+          // Recreate title observer if it was cleaned up
+          if (!this.titleObserver && this._handleTitleChange) {
+            this.titleObserver = new MutationObserver(this._handleTitleChange);
+            const titleContainer = document.querySelector(this.selectors.TITLE_CONTAINER);
+            if (titleContainer) {
+              this.titleObserver.observe(titleContainer, { childList: true, subtree: true });
+            }
+          }
         } catch (error) {
         }
-        
+
         const videoInfo = {
           title: this.getVideoTitle(),
           artist: this.getArtistName(),
@@ -256,25 +265,44 @@ export class YouTubeIntegration {
   }
 
   /**
-   * Cleanup observers and intervals
+   * Cleanup per-video resources (called between videos)
+   * Only resets title observer, keeps navigation listeners active
    */
   cleanup() {
+    // Only disconnect title observer - it will be recreated for the new video
     if (this.titleObserver) {
       this.titleObserver.disconnect();
       this.titleObserver = null;
     }
 
+    // Note: Navigation listeners (urlObserver, _handleUrlChange, etc.) are NOT removed
+    // They must persist across video changes to enable auto-refresh
+  }
+
+  /**
+   * Full cleanup/teardown (called when extension is disabled or unloaded)
+   * Removes all observers and event listeners
+   */
+  destroy() {
+    // Disconnect title observer
+    if (this.titleObserver) {
+      this.titleObserver.disconnect();
+      this.titleObserver = null;
+    }
+
+    // Disconnect URL observer
     if (this.urlObserver) {
       try { this.urlObserver.disconnect(); } catch (e) { }
       this.urlObserver = null;
     }
 
+    // Clear URL check interval
     if (this.urlCheckInterval) {
       clearInterval(this.urlCheckInterval);
       this.urlCheckInterval = null;
     }
 
-    // Remove navigation event listeners if present
+    // Remove navigation event listeners
     try {
       if (this._handleUrlChange) {
         window.removeEventListener('yt-navigate-finish', this._handleUrlChange);
