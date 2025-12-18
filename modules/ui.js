@@ -309,37 +309,44 @@ export class LyricsUI {
         visibility: visible !important;
       }
       
-      /* Word-by-word highlighting */
+      /* Word-by-word highlighting with smooth animations */
       .lyric-word {
         display: inline-block;
-        transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-        margin: 0 2px;
+        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        margin: 0 3px;
       }
       
       .lyric-word.highlighted {
         color: #ffffff !important;
-        text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
-        transform: scale(1.05);
+        text-shadow: 0 0 20px rgba(255, 255, 255, 0.6), 0 0 40px rgba(255, 255, 255, 0.3);
+        transform: scale(1.08);
         font-weight: 700;
       }
       
       .lyric-word.past {
         color: rgba(255, 255, 255, 0.5) !important;
+        font-weight: 500;
       }
       
       .lyric-word.future {
-        color: rgba(255, 255, 255, 0.3) !important;
+        color: rgba(255, 255, 255, 0.35) !important;
       }
       
-      /* Gradient text effect for current line */
+      /* Gradient text effect for current line - Apple Music style */
       .lyric-line.current-gradient {
         background: linear-gradient(90deg, 
-          rgba(255, 255, 255, 0.5) 0%,
+          rgba(255, 255, 255, 0.85) 0%,
           rgba(255, 255, 255, 1) 50%,
-          rgba(255, 255, 255, 0.5) 100%);
+          rgba(255, 255, 255, 0.85) 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        animation: gradientShift 3s ease-in-out infinite;
+      }
+      
+      @keyframes gradientShift {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
       }
     `;
     // Store injected style element so it can be removed on cleanup
