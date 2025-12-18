@@ -163,14 +163,25 @@ export class YouTubeIntegration {
       const currentUrl = window.location.href;
       const currentVideoId = this.getVideoId();
 
+      console.log('[YT Lyrics] URL change detected', {
+        currentUrl,
+        currentVideoId,
+        storedUrl: this.currentUrl,
+        storedVideoId: this.currentVideoId
+      });
+
       if (this.isVideoPage()) {
         // Check both URL and video ID to catch all navigation types
         if (currentUrl !== this.currentUrl || currentVideoId !== this.currentVideoId) {
+          console.log('[YT Lyrics] Video changed! Triggering navigate...');
           this.currentUrl = currentUrl;
           this.currentVideoId = currentVideoId;
           this.triggerNavigate();
+        } else {
+          console.log('[YT Lyrics] Same video, ignoring');
         }
       } else if (this.currentUrl.includes('/watch')) {
+        console.log('[YT Lyrics] Navigated away from video');
         this.currentUrl = currentUrl;
         this.currentVideoId = '';
         this.triggerNavigate(true); // Navigate away
@@ -180,7 +191,9 @@ export class YouTubeIntegration {
 
     this._handleTitleChange = debounce(() => {
       const title = this.getVideoTitle();
+      console.log('[YT Lyrics] Title change detected', { title, storedTitle: this.currentTitle });
       if (title && title !== this.currentTitle) {
+        console.log('[YT Lyrics] Title changed! Triggering navigate...');
         this.currentTitle = title;
         if (this.isVideoPage()) {
           this.triggerNavigate();
@@ -194,11 +207,15 @@ export class YouTubeIntegration {
     const titleContainer = document.querySelector(this.selectors.TITLE_CONTAINER);
     if (titleContainer) {
       this.titleObserver.observe(titleContainer, { childList: true, subtree: true });
+      console.log('[YT Lyrics] Title observer created and watching');
+    } else {
+      console.warn('[YT Lyrics] Title container not found, title observer not created');
     }
 
     // Watch for YouTube navigation events
     window.addEventListener('yt-navigate-finish', this._handleUrlChange);
     window.addEventListener('popstate', this._handleUrlChange);
+    console.log('[YT Lyrics] Navigation event listeners added');
 
     // Fallback: observe DOM changes to detect SPA navigation without polling
     try {
@@ -210,6 +227,7 @@ export class YouTubeIntegration {
       });
 
       this.urlObserver.observe(document.body, { childList: true, subtree: true, attributes: true });
+      console.log('[YT Lyrics] URL observer created');
     } catch (e) {
       // If MutationObserver not available, fall back to light polling
       this.urlCheckInterval = setInterval(() => {
@@ -217,12 +235,14 @@ export class YouTubeIntegration {
           if (this._handleUrlChange) this._handleUrlChange();
         }
       }, 3000);
+      console.log('[YT Lyrics] Using polling fallback');
     }
 
     // Initial check
     this.currentUrl = window.location.href;
     this.currentVideoId = this.getVideoId();
     if (this.isVideoPage()) {
+      console.log('[YT Lyrics] Initial video page detected, triggering navigate');
       setTimeout(() => this.triggerNavigate(), 500);
     }
   }
@@ -231,6 +251,7 @@ export class YouTubeIntegration {
    * Trigger navigation callback
    */
   async triggerNavigate(navigateAway = false) {
+    console.log('[YT Lyrics] triggerNavigate called', { navigateAway });
     if (this.onNavigateCallback) {
       if (navigateAway) {
         this.onNavigateCallback(null);
@@ -244,6 +265,7 @@ export class YouTubeIntegration {
 
           // Recreate title observer if it was cleaned up
           if (!this.titleObserver && this._handleTitleChange) {
+            console.log('[YT Lyrics] Recreating title observer after cleanup');
             this.titleObserver = new MutationObserver(this._handleTitleChange);
             const titleContainer = document.querySelector(this.selectors.TITLE_CONTAINER);
             if (titleContainer) {
@@ -251,6 +273,7 @@ export class YouTubeIntegration {
             }
           }
         } catch (error) {
+          console.error('[YT Lyrics] Error waiting for elements', error);
         }
 
         const videoInfo = {
@@ -259,8 +282,11 @@ export class YouTubeIntegration {
           videoId: this.getVideoId(),
           url: window.location.href
         };
+        console.log('[YT Lyrics] Calling onNavigateCallback with videoInfo', videoInfo);
         this.onNavigateCallback(videoInfo);
       }
+    } else {
+      console.warn('[YT Lyrics] onNavigateCallback not set!');
     }
   }
 
