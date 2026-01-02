@@ -1,4 +1,5 @@
 import { SELECTORS, UI_CONFIG } from './constants.js';
+import { ColorExtractor } from './color-utils.js';
 
 /**
  * UI Module - Handles all UI creation and manipulation with Apple Music styling
@@ -28,6 +29,10 @@ export class LyricsUI {
     this._lastScrollIndex = -1;
     this._isScrolling = false;
     this._scrollAnimationId = null;
+    // Visual effects - progress bar and adaptive colors
+    this.progressBar = null;
+    this.blurredBackground = null;
+    this.adaptiveColors = null;
   }
 
   /**
@@ -124,16 +129,16 @@ export class LyricsUI {
       } else if (i === currentIndex) {
         line.classList.add('lyric-current');
 
-        // Handle word highlighting for current line
+        // Handle word highlighting for current line based on mode
         const wordsOnLine = line.querySelectorAll('.lyric-word');
-        wordsOnLine.forEach(w => {
-          w.classList.remove('future', 'past');
-          if (this.highlightMode === 'line') {
+        if (this.highlightMode === 'line') {
+          // In line mode, highlight all words immediately
+          wordsOnLine.forEach(w => {
+            w.classList.remove('future', 'past');
             w.classList.add('highlighted');
-          } else {
-            w.classList.remove('highlighted');
-          }
-        });
+          });
+        }
+        // In word mode, don't set highlighted here - let updateWordHighlight handle it
       } else if (i === nextIndex) {
         line.classList.add('lyric-next');
       }
@@ -318,11 +323,11 @@ export class LyricsUI {
         pointer-events: auto !important;
       }
       
-      /* Word highlighting */
-      .lyric-word { display: inline; transition: color 0.25s ease; }
-      .lyric-word.highlighted { color: #ffffff !important; font-weight: 700 !important; }
-      .lyric-word.past { color: rgba(255, 255, 255, 0.6) !important; }
-      .lyric-word.future { color: rgba(255, 255, 255, 0.35) !important; }
+      /* Word highlighting - Increased specificity to override line styles */
+      #lyrics-display .lyric-word { display: inline; transition: color 0.1s ease; }
+      #lyrics-display .lyric-word.highlighted { color: #ffffff !important; font-weight: 700 !important; opacity: 1 !important; }
+      #lyrics-display .lyric-word.past { color: rgba(255, 255, 255, 0.6) !important; opacity: 1 !important; font-weight: 400 !important; }
+      #lyrics-display .lyric-word.future { color: rgba(255, 255, 255, 0.35) !important; opacity: 1 !important; font-weight: 400 !important; }
       
       /* Title visibility */
       #song-title, #song-artist { opacity: 1 !important; visibility: visible !important; }
@@ -356,8 +361,8 @@ export class LyricsUI {
       width: 80px;
       height: 80px;
       object-fit: cover;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.3);
       display: none;
       flex-shrink: 0;
     `;
@@ -483,6 +488,7 @@ export class LyricsUI {
 
       // Check if lyric has word-level timing
       if (lyric.words && lyric.words.length > 0) {
+        if (index === 0) console.log('[UI debug] Rendering line 0 with words:', lyric.words);
         // Create word-by-word display
         lyric.words.forEach((wordData, wordIndex) => {
           const wordSpan = document.createElement('span');
@@ -542,16 +548,50 @@ export class LyricsUI {
   }
 
   /**
+   * Set highlight mode and refresh display
+   */
+  setHighlightMode(mode) {
+    const previousMode = this.highlightMode;
+    this.highlightMode = mode;
+    console.log(`[UI] Highlight mode changed: ${previousMode} -> ${mode}`);
+    
+    // If we have cached lines and mode changed, refresh word highlighting
+    if (this._cachedLines && previousMode !== mode) {
+      const currentLine = Array.from(this._cachedLines).find(line => 
+        line.classList.contains('lyric-current')
+      );
+      if (currentLine) {
+        const words = currentLine.querySelectorAll('.lyric-word');
+        if (mode === 'line') {
+          // In line mode, highlight all words on current line
+          words.forEach(w => {
+            w.classList.remove('past', 'future');
+            w.classList.add('highlighted');
+          });
+        } else {
+          // In word mode, remove highlighted class to let word-by-word work
+          words.forEach(w => {
+            w.classList.remove('highlighted');
+          });
+        }
+      }
+    }
+  }
+
+  /**
    * Update word-by-word highlighting within a line
    */
   updateWordHighlight(lineElement, currentTime) {
     const words = lineElement.querySelectorAll('.lyric-word');
     if (words.length === 0) return;
 
+    // console.log(`[UI debug] updateWordHighlight: line=${lineElement.dataset.index} words=${words.length} mode=${this.highlightMode} time=${currentTime}`);
+
     // Only highlight words if in word mode
     if (this.highlightMode !== 'word') {
       words.forEach(word => {
         word.classList.remove('highlighted', 'past', 'future');
+        word.classList.add('highlighted'); // In line mode, all words are highlighted
       });
       return;
     }
@@ -587,6 +627,12 @@ export class LyricsUI {
       const cur = wordArray[currentWordIndex];
       cur.classList.add('highlighted');
       cur.classList.remove('past', 'future');
+
+      // Add subtle pulse animation for active word
+      cur.style.animation = 'word-pulse 0.4s ease-out';
+      setTimeout(() => {
+        if (cur) cur.style.animation = '';
+      }, 400);
     }
 
     // Lazily mark words before current as past and after as future only when needed
@@ -616,9 +662,9 @@ export class LyricsUI {
   }
 
   /**
-   * Update album cover in panel header
+   * Update album cover in panel header with color extraction and blurred background
    */
-  updateAlbumCover(imageUrl, showInPanel = true) {
+  async updateAlbumCover(imageUrl, showInPanel = true) {
     const albumCoverElement = document.getElementById('panel-album-cover');
 
     if (!albumCoverElement) return;
@@ -626,8 +672,148 @@ export class LyricsUI {
     if (imageUrl && showInPanel) {
       albumCoverElement.src = imageUrl;
       albumCoverElement.style.display = 'block';
+
+      // Add gentle float animation to album cover
+      albumCoverElement.style.animation = 'album-float 6s ease-in-out infinite';
+
+      // Extract colors and update theme
+      try {
+        const colors = await ColorExtractor.extractDominantColors(imageUrl, 3);
+        this.adaptiveColors = colors;
+        this.updateAdaptiveGradient(colors);
+        this.updateBlurredBackground(imageUrl, colors);
+      } catch (error) {
+        console.warn('Failed to extract colors from album art:', error);
+      }
     } else {
       albumCoverElement.style.display = 'none';
+    }
+  }
+
+  /**
+   * Update adaptive gradient overlay on panel based on album art colors
+   */
+  updateAdaptiveGradient(colors) {
+    if (!this.panel || !colors) return;
+
+    const gradient = ColorExtractor.generateGradient(colors, '135deg');
+    this.panel.style.background = gradient;
+    this.panel.style.backdropFilter = 'blur(20px)';
+    this.panel.style.webkitBackdropFilter = 'blur(20px)';
+  }
+
+  /**
+   * Create or update blurred album art background
+   */
+  updateBlurredBackground(imageUrl, colors = null) {
+    if (!this.container) return;
+
+    // Find or create blurred background layer
+    if (!this.blurredBackground) {
+      this.blurredBackground = document.createElement('div');
+      this.blurredBackground.className = 'lyrics-blurred-background';
+      this.blurredBackground.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 0;
+        border-radius: 16px;
+        overflow: hidden;
+        pointer-events: none;
+      `;
+
+      // Insert as first child (behind panel)
+      this.container.insertBefore(this.blurredBackground, this.container.firstChild);
+    }
+
+    if (imageUrl) {
+      // Set blurred background image
+      this.blurredBackground.style.backgroundImage = `url("${imageUrl}")`;
+      this.blurredBackground.style.backgroundSize = 'cover';
+      this.blurredBackground.style.backgroundPosition = 'center';
+      this.blurredBackground.style.filter = 'blur(40px) brightness(0.6)';
+      this.blurredBackground.style.transform = 'scale(1.1)'; // Prevent blur edge artifacts
+      this.blurredBackground.style.opacity = '1';
+      this.blurredBackground.style.transition = 'opacity 0.8s ease, filter 0.8s ease';
+
+      // Add radial gradient overlay for depth
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: ${colors ? ColorExtractor.generateRadialGradient(colors) : 'radial-gradient(circle at center, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.6) 100%)'};
+        z-index: 1;
+      `;
+
+      // Clear existing overlays and add new one
+      while (this.blurredBackground.firstChild) {
+        this.blurredBackground.removeChild(this.blurredBackground.firstChild);
+      }
+      this.blurredBackground.appendChild(overlay);
+    } else {
+      this.blurredBackground.style.opacity = '0';
+    }
+  }
+
+  /**
+   * Create progress bar for song position
+   */
+  createProgressBar() {
+    if (this.progressBar || !this.panel) return;
+
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'lyrics-progress-container';
+    progressContainer.style.cssText = `
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+      z-index: 10;
+    `;
+
+    this.progressBar = document.createElement('div');
+    this.progressBar.className = 'lyrics-progress-bar';
+    this.progressBar.style.cssText = `
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%);
+      transition: width 0.3s ease-out;
+      box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+    `;
+
+    progressContainer.appendChild(this.progressBar);
+    this.panel.appendChild(progressContainer);
+
+    return progressContainer;
+  }
+
+  /**
+   * Update progress bar position
+   * @param {number} percentage - Progress percentage (0-100)
+   */
+  updateProgressBar(percentage) {
+    if (!this.progressBar) {
+      this.createProgressBar();
+    }
+
+    if (this.progressBar) {
+      const clampedPercentage = Math.max(0, Math.min(100, percentage));
+      this.progressBar.style.width = `${clampedPercentage}%`;
+
+      // Update gradient color if adaptive colors are available
+      if (this.adaptiveColors && this.adaptiveColors.length >= 2) {
+        const color1 = ColorExtractor._addAlpha(this.adaptiveColors[0], 0.8);
+        const color2 = ColorExtractor._addAlpha(this.adaptiveColors[1], 0.8);
+        this.progressBar.style.background = `linear-gradient(90deg, ${color1} 0%, ${color2} 100%)`;
+      }
     }
   }
 
@@ -833,13 +1019,6 @@ export class LyricsUI {
         }
       });
     }
-  }
-
-  /**
-   * Set highlight mode (line or word)
-   */
-  setHighlightMode(mode) {
-    this.highlightMode = mode;
   }
 
   /**

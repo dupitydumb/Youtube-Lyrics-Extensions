@@ -1,17 +1,7 @@
 /* YouTube Lyrics Extension - Main Styles */
 
 /* ==================== PANEL CONTAINER ==================== */
-#lyrics-panel-container {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  margin-bottom: 1rem;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  opacity: 1;
-}
-
+#lyrics-panel-container,
 #Lyric-Panel-Container {
   position: sticky !important;
   top: 0;
@@ -23,8 +13,10 @@
   opacity: 1;
 }
 
-/* ==================== BACKGROUND LAYER ==================== */
-.lyrics-background {
+
+
+/* Blurred album art background layer */
+.lyrics-blurred-background {
   position: absolute;
   top: 0;
   left: 0;
@@ -32,41 +24,20 @@
   bottom: 0;
   z-index: 0;
   border-radius: 16px;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  opacity: 0;
-  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: opacity;
-  pointer-events: none;
   overflow: hidden;
-}
-
-.lyrics-background::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(to bottom,
-      rgba(0, 0, 0, 0.2) 0%,
-      rgba(0, 0, 0, 0.4) 50%,
-      rgba(0, 0, 0, 0.6) 100%);
-  border-radius: 16px;
-  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.8s ease, filter 0.8s ease;
   pointer-events: none;
 }
 
-/* Static gradient - no animations needed */
-
-/* ==================== MAIN PANEL ==================== */
+/* ==================== MAIN PANEL WITH GLASSMORPHISM ==================== */
 #lyrics-panel {
   position: relative;
   z-index: 1;
   background: linear-gradient(135deg, rgba(30, 30, 35, 0.75) 0%, rgba(20, 20, 25, 0.85) 100%);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 2rem;
   color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -79,12 +50,17 @@
   gap: 1.25rem;
 }
 
-#Lyric-Panel {
-  position: relative !important;
-  z-index: 2 !important;
+/* Album cover styling */
+#panel-album-cover {
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease;
 }
 
-/* ==================== HEADER ==================== */
+#panel-album-cover:hover {
+  transform: scale(1.05);
+}
+
 .lyrics-header {
   display: flex;
   justify-content: center;
@@ -771,6 +747,34 @@
     text-shadow: 0 0 30px rgba(255, 255, 255, 0.8),
       0 0 50px rgba(255, 255, 255, 0.5),
       0 0 70px rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* Album cover float animation */
+@keyframes album-float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Word pulse micro-animation */
+@keyframes word-pulse {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(1.05);
   }
 }
 

@@ -3,8 +3,14 @@
   "name": "Youtube Lyrics",
   "version": "2.0.3",
   "description": "A Chrome extension that displays synchronized lyrics for YouTube videos with a beautiful, modern interface.",
-  "permissions": ["activeTab", "storage"],
-  "host_permissions": ["https://lrclib.net/*"],
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://lrclib.net/*",
+    "https://apic-desktop.musixmatch.com/*"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -25,8 +31,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/*"],
-      "js": ["loader.js"],
+      "matches": [
+        "*://*.youtube.com/*"
+      ],
+      "js": [
+        "loader.js"
+      ],
       "run_at": "document_end"
     }
   ],
@@ -40,13 +50,17 @@
         "modules/api.js",
         "modules/sync.js",
         "modules/ui.js",
+        "modules/color-utils.js",
         "modules/background.js",
         "modules/youtube.js",
         "modules/fullscreen.js",
         "modules/main.js",
-        "modules/romanization.js"
+        "modules/romanization.js",
+        "modules/AlternativeProvider/musicmatch.js"
       ],
-      "matches": ["*://*.youtube.com/*"]
+      "matches": [
+        "*://*.youtube.com/*"
+      ]
     }
   ],
   "content_security_policy": {

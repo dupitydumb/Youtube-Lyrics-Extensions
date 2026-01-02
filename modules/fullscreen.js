@@ -641,57 +641,99 @@ export class FullscreenManager {
     // Word-level updates (happens every frame for word mode)
     if (currentTime !== null && this.highlightMode === 'word') {
       const currentLine = lyricLines[currentIndex];
-      if (currentLine) {
-        const words = currentLine.querySelectorAll('.lyric-word');
-        words.forEach((word, wordIndex) => {
-          const wordTime = parseFloat(word.dataset.wordTime);
 
-          if (!isNaN(wordTime)) {
-            const timeDiff = currentTime - wordTime;
-            const staggerDelay = Math.min(wordIndex * 0.05, 0.3); // Max 300ms stagger
+      // Cache words for the current line if index changed or cache missing
+      if (indexChanged || !this._cachedCurrentLineWords || this._cachedCurrentLineIndex !== currentIndex) {
+        if (currentLine) {
+          this._cachedCurrentLineWords = Array.from(currentLine.querySelectorAll('.lyric-word'));
+          // Pre-parse word times to avoid repeated parseFloat calls
+          this._cachedWordTimes = this._cachedCurrentLineWords.map(w => parseFloat(w.dataset.wordTime) || 0);
+          this._cachedCurrentLineIndex = currentIndex;
+        } else {
+          this._cachedCurrentLineWords = [];
+          this._cachedWordTimes = [];
+          this._cachedCurrentLineIndex = -1;
+        }
+        // Reset active word index when line changes
+        this._lastActiveWordIndex = -1;
+      }
 
-            // Active word - spring animation with glow
-            if (timeDiff >= 0 && timeDiff < 0.3) {
-              // Reset and trigger spring animation
-              word.style.animation = 'none';
-              void word.offsetWidth; // Trigger reflow
-              word.style.animation = `word-spring-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) ${staggerDelay}s`;
-
-              word.style.color = '#ffffff';
-              word.style.textShadow = '0 0 20px rgba(255, 255, 255, 0.6), 0 0 40px rgba(255, 255, 255, 0.3)';
-              word.style.transform = 'scale(1.08) translateY(-1px) translateZ(0)';
-              word.style.fontWeight = '700';
-              word.style.filter = 'blur(0px)';
-
-              // Held word - add bounce animation
-            } else if (timeDiff >= 0.3 && timeDiff < 1.0) {
-              word.style.animation = 'word-bounce 0.6s ease-in-out infinite';
-              word.style.color = '#ffffff';
-              word.style.textShadow = '0 2px 12px rgba(255, 255, 255, 0.3)';
-              word.style.transform = 'scale(1.08) translateZ(0)';
-              word.style.fontWeight = '600';
-              word.style.filter = 'blur(0px)';
-
-              // Past word
-            } else if (timeDiff >= 1.0) {
-              word.style.animation = 'none';
-              word.style.color = 'rgba(255, 255, 255, 0.5)';
-              word.style.textShadow = 'none';
-              word.style.transform = 'scale(1) translateZ(0)';
-              word.style.fontWeight = '400';
-              word.style.filter = 'blur(0px)';
-
-              // Future word
-            } else {
-              word.style.animation = 'none';
-              word.style.color = 'rgba(255, 255, 255, 0.3)';
-              word.style.textShadow = 'none';
-              word.style.transform = 'scale(1) translateZ(0)';
-              word.style.fontWeight = '400';
-              word.style.filter = 'blur(0px)';
-            }
+      const words = this._cachedCurrentLineWords;
+      const wordTimes = this._cachedWordTimes || [];
+      if (words.length > 0) {
+        // Binary search for current word index (optimized)
+        let low = 0, high = words.length - 1, activeWordIndex = -1;
+        while (low <= high) {
+          const mid = Math.floor((low + high) / 2);
+          const wTime = wordTimes[mid];
+          if (wTime <= currentTime) {
+            activeWordIndex = mid;
+            low = mid + 1;
+          } else {
+            high = mid - 1;
           }
-        });
+        }
+
+        // Only update if the active word changed or it's a new line
+        if (this._lastActiveWordIndex !== activeWordIndex || indexChanged) {
+          this._lastActiveWordIndex = activeWordIndex;
+
+          words.forEach((word, wordIndex) => {
+            // Skip if we shouldn't update (optimization could be deeper but this is cleaner)
+            const wordTime = parseFloat(word.dataset.wordTime);
+            const timeDiff = currentTime - wordTime;
+
+            // Check current state to avoid redundant style writes
+            const currentState = word.dataset.state || 'future';
+            let newState = 'future';
+
+            if (wordIndex === activeWordIndex) {
+              newState = 'active';
+            } else if (wordIndex < activeWordIndex) {
+              newState = 'past';
+            } else {
+              newState = 'future';
+            }
+
+            // Only write to DOM if state changed or it's the active word (for dynamic animation)
+            if (currentState !== newState || newState === 'active') {
+              word.dataset.state = newState;
+
+              if (newState === 'active') { // Active word - spring animation
+                const staggerDelay = Math.min(wordIndex * 0.05, 0.3);
+
+                // Only trigger animation start once
+                if (currentState !== 'active') {
+                  word.style.animation = 'none';
+                  void word.offsetWidth; // Trigger reflow
+                  word.style.animation = `word-spring-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) ${staggerDelay}s`;
+                }
+
+                word.style.color = '#ffffff';
+                word.style.textShadow = '0 0 20px rgba(255, 255, 255, 0.6), 0 0 40px rgba(255, 255, 255, 0.3)';
+                word.style.transform = 'scale(1.08) translateY(-1px) translateZ(0)';
+                word.style.fontWeight = '700';
+                word.style.filter = 'blur(0px)';
+
+              } else if (newState === 'past') { // Past word
+                word.style.animation = 'none';
+                word.style.color = 'rgba(255, 255, 255, 0.5)';
+                word.style.textShadow = 'none';
+                word.style.transform = 'scale(1) translateZ(0)';
+                word.style.fontWeight = '400';
+                word.style.filter = 'blur(0px)';
+
+              } else { // Future word
+                word.style.animation = 'none';
+                word.style.color = 'rgba(255, 255, 255, 0.3)';
+                word.style.textShadow = 'none';
+                word.style.transform = 'scale(1) translateZ(0)';
+                word.style.fontWeight = '400';
+                word.style.filter = 'blur(0px)';
+              }
+            }
+          });
+        }
       }
     }
   }

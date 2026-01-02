@@ -12,6 +12,7 @@ import { FullscreenManager } from './fullscreen.js';
 import { EventBus, EVENTS } from './events.js';
 import { FILTER_WORDS } from './constants.js';
 import { Romanizer } from './romanization.js';
+import { Musixmatch } from './AlternativeProvider/musicmatch.js';
 
 class YouTubeLyricsApp {
   constructor() {
@@ -23,6 +24,60 @@ class YouTubeLyricsApp {
     this.background = new BackgroundManager();
     this.youtube = new YouTubeIntegration();
     this.fullscreen = new FullscreenManager(this.background);
+
+    // Create custom fetch function that routes through content script bridge (bypasses CORS)
+    // Uses window.postMessage to communicate with loader.js content script
+    const pendingRequests = new Map();
+    let requestCounter = 0;
+
+    // Listen for responses from the content script bridge
+    window.addEventListener('message', (event) => {
+      if (event.source !== window) return;
+      if (event.data && event.data.type === 'MUSIXMATCH_FETCH_RESPONSE') {
+        const requestId = event.data.requestId;
+        const handler = pendingRequests.get(requestId);
+        if (handler) {
+          pendingRequests.delete(requestId);
+          if (event.data.error) {
+            handler.reject(new Error(event.data.error));
+          } else if (event.data.response && event.data.response.success) {
+            handler.resolve({
+              ok: true,
+              json: async () => event.data.response.data,
+              text: async () => typeof event.data.response.data === 'string'
+                ? event.data.response.data
+                : JSON.stringify(event.data.response.data)
+            });
+          } else {
+            handler.reject(new Error(event.data.response?.error || 'Fetch failed'));
+          }
+        }
+      }
+    });
+
+    const backgroundFetch = (url) => {
+      return new Promise((resolve, reject) => {
+        const requestId = ++requestCounter;
+        pendingRequests.set(requestId, { resolve, reject });
+
+        // Send request to content script bridge via postMessage
+        window.postMessage({
+          type: 'MUSIXMATCH_FETCH_REQUEST',
+          requestId: requestId,
+          url: url
+        }, '*');
+
+        // Timeout after 30 seconds
+        setTimeout(() => {
+          if (pendingRequests.has(requestId)) {
+            pendingRequests.delete(requestId);
+            reject(new Error('Request timeout'));
+          }
+        }, 30000);
+      });
+    };
+
+    this.musixmatch = new Musixmatch(null, true, backgroundFetch); // Enhanced mode with custom fetch
 
     this.currentVideoInfo = null;
     this.currentLyrics = null;
@@ -165,6 +220,11 @@ class YouTubeLyricsApp {
     // Sync events
     this.sync.onUpdate((data) => {
       this.ui.updateCurrentLyric(data.currentIndex, data.currentTime, data.indexChanged);
+
+      // Update progress bar
+      if (data.progress !== undefined) {
+        this.ui.updateProgressBar(data.progress);
+      }
 
       // If fullscreen is active, update there too
       if (this.fullscreen.isActive) {
@@ -316,6 +376,7 @@ class YouTubeLyricsApp {
 
   /**
    * Load lyrics for video with multi-strategy search
+   * Prioritizes Musixmatch provider, falls back to LRCLIB API
    */
   async loadLyrics(videoInfo) {
     try {
@@ -385,9 +446,45 @@ class YouTubeLyricsApp {
         }
       ];
 
-      // Try each strategy until we get good results
-      let results = null;
+      // PRIORITY 1: Try Musixmatch first with different strategies
+      let musixmatchResult = null;
       let successfulStrategy = null;
+
+      for (const strategy of strategies) {
+        if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
+          continue;
+        }
+
+        try {
+          console.log(`[Musixmatch] Trying strategy: ${strategy.name} with query: "${strategy.query}"`);
+          musixmatchResult = await this.musixmatch.getLrc(strategy.query);
+          console.log('[Musixmatch] Response:', JSON.stringify(musixmatchResult, null, 2));
+
+          if (musixmatchResult && musixmatchResult.synced) {
+            console.log(`[Musixmatch] Found lyrics with strategy: ${strategy.name}`);
+            successfulStrategy = strategy;
+            break;
+          }
+        } catch (error) {
+          console.log(`[Musixmatch] Strategy ${strategy.name} failed:`, error.message);
+          continue;
+        }
+      }
+
+      // If Musixmatch found lyrics, process them
+      if (musixmatchResult && musixmatchResult.synced) {
+        this.processMusixmatchResults(
+          musixmatchResult,
+          videoInfo,
+          successfulStrategy ? successfulStrategy.songName : videoInfo.title,
+          successfulStrategy ? successfulStrategy.artistName : videoInfo.artist
+        );
+        return;
+      }
+
+      // PRIORITY 2: Fall back to LRCLIB API
+      console.log('[LRCLIB] Falling back to LRCLIB API...');
+      let results = null;
 
       for (const strategy of strategies) {
         if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
@@ -421,8 +518,108 @@ class YouTubeLyricsApp {
       );
 
     } catch (error) {
+      console.error('[Lyrics] Failed to load lyrics:', error);
       this.ui.showError('Failed to load lyrics');
     }
+  }
+
+  /**
+   * Process Musixmatch lyrics results
+   */
+  async processMusixmatchResults(musixmatchResult, videoInfo, songName = '', artistName = '') {
+    // Parse synced lyrics from LRC format
+    const syncedLyrics = this.api.parseSyncedLyrics(musixmatchResult.synced);
+
+    if (!syncedLyrics || syncedLyrics.length === 0) {
+      // Fall back to LRCLIB if parsing failed
+      console.log('[Musixmatch] Failed to parse lyrics, falling back to LRCLIB...');
+      return this.loadLyricsFromLRCLIB(videoInfo, songName, artistName);
+    }
+
+    // Attach romanization if enabled
+    const withRoman = this.applyRomanizationIfNeeded(syncedLyrics);
+    this.currentLyrics = withRoman;
+
+    // Update title and artist in header
+    this.ui.updateTitle(songName || videoInfo.title, artistName || videoInfo.artist);
+
+    // Check if we have word-level timings
+    const hasWordTimings = syncedLyrics.some(line => line.words && line.words.length > 0);
+
+    if (hasWordTimings) {
+      console.log('[Musixmatch] Word-level timings detected, switching to WORD mode');
+      // Update internal state, settings, and UI
+      this.highlightMode = 'word';
+      this.settings.set('highlightMode', 'word');
+      this.ui.setHighlightMode('word');
+
+      // Also update fullscreen manager if it exists
+      if (this.fullscreen) {
+        this.fullscreen.setHighlightMode('word');
+      }
+    }
+
+    // Display lyrics
+    this.ui.displaySyncedLyrics(this.currentLyrics);
+
+    // Apply stored font size
+    const storedFontSize = this.settings.get('fontSize');
+    if (storedFontSize) {
+      this.ui.setFontSize(storedFontSize);
+    }
+
+    // Create controls (no-op for now but kept for compatibility)
+    this.createControls(null, []);
+
+    // Setup sync
+    const videoElement = this.youtube.getVideoElement();
+    if (videoElement) {
+      this.sync.initialize(videoElement, syncedLyrics, this.settings.get('syncDelay'));
+      this.sync.start();
+    }
+
+    // Load album art and update background
+    this.albumArtUrl = await this.youtube.extractAlbumArt();
+    if (this.albumArtUrl) {
+      this.background.updateBackground(this.albumArtUrl);
+      // Update album cover in panel if setting is enabled
+      const showInPanel = this.settings.get('showAlbumCoverInPanel');
+      this.ui.updateAlbumCover(this.albumArtUrl, showInPanel);
+    }
+
+    console.log('[Musixmatch] Successfully loaded lyrics');
+  }
+
+  /**
+   * Load lyrics from LRCLIB API only (fallback method)
+   */
+  async loadLyricsFromLRCLIB(videoInfo, songName, artistName) {
+    const { TitleParser } = await import('./api.js');
+    const parsed = TitleParser.parseTitle(videoInfo.title, videoInfo.artist);
+
+    const strategies = [
+      { query: `${parsed.song} ${parsed.artist}`.trim(), enabled: parsed.song && parsed.artist },
+      { query: `${videoInfo.title} ${videoInfo.artist}`.trim(), enabled: videoInfo.title && videoInfo.artist },
+      { query: videoInfo.title, enabled: videoInfo.title }
+    ];
+
+    let results = null;
+    for (const strategy of strategies) {
+      if (!strategy.enabled || !strategy.query) continue;
+      try {
+        results = await this.api.searchLyrics(strategy.query);
+        if (results && results.length > 0) break;
+      } catch (error) {
+        continue;
+      }
+    }
+
+    if (!results || results.length === 0) {
+      this.ui.showError('No lyrics found for this song');
+      return;
+    }
+
+    this.processLyricsResults(results, videoInfo, songName, artistName);
   }
 
   /**
@@ -450,6 +647,18 @@ class YouTubeLyricsApp {
 
       // Update title and artist in header
       this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist);
+
+      // Check if we have word-level timings and auto-switch to word mode
+      const hasWordTimings = syncedLyrics.some(line => line.words && line.words.length > 0);
+      if (hasWordTimings) {
+        console.log('[LRCLIB] Word-level timings detected, switching to WORD mode');
+        this.highlightMode = 'word';
+        this.settings.set('highlightMode', 'word');
+        this.ui.setHighlightMode('word');
+        if (this.fullscreen) {
+          this.fullscreen.setHighlightMode('word');
+        }
+      }
 
       // Display lyrics
       this.ui.displaySyncedLyrics(this.currentLyrics);
