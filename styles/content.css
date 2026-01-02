@@ -288,106 +288,89 @@
   color: rgba(102, 126, 234, 1);
 }
 
-/* ==================== LYRICS CONTAINER - 3-LINE DISPLAY ==================== */
+/* ==================== LYRICS CONTAINER - APPLE MUSIC SCROLLABLE ==================== */
 #lyrics-display {
   flex: 1;
-  overflow: hidden;
-  padding: 1.5rem 1rem;
-  text-align: center;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem 1.5rem;
+  text-align: left;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 0;
-  min-height: 180px;
-  max-height: 220px;
+  justify-content: flex-start;
+  align-items: stretch;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  gap: 0.25rem;
+  min-height: 280px;
+  max-height: 400px;
   position: relative;
+}
+
+#lyrics-display::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* ==================== LYRICS LINE - BASE ==================== */
 .lyric-line {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%) translateY(100px);
-  opacity: 0;
-  padding: 0.5rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 400;
-  line-height: 1.4;
-  letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.5);
+  position: relative;
+  padding: 0.75rem 1rem;
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.45);
   cursor: pointer;
-  max-width: 95%;
-  text-align: center;
+  text-align: left;
   white-space: normal;
   word-wrap: break-word;
-  pointer-events: none;
+  border-radius: 8px;
   /* Smooth transitions for all state changes */
   transition:
-    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    font-size 0.4s cubic-bezier(0.4, 0, 0.2, 1),
     color 0.3s ease,
+    font-weight 0.3s ease,
+    opacity 0.3s ease,
     text-shadow 0.3s ease;
-  will-change: transform, opacity;
 }
 
-/* ==================== 3-LINE POSITION STATES ==================== */
+/* ==================== APPLE MUSIC LINE STATES ==================== */
 
-/* PREVIOUS LINE - Top position, faded */
-.lyric-line.lyric-prev {
-  transform: translateX(-50%) translateY(-60px);
-  opacity: 0.5;
-  font-size: 0.95rem;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.45);
-  pointer-events: auto;
+/* PAST LINES - Dimmer, already played */
+.lyric-line.lyric-past {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 500;
 }
 
-/* CURRENT LINE - Center position, bright and prominent */
+/* CURRENT LINE - Bold white, prominent */
 .lyric-line.lyric-current {
-  transform: translateX(-50%) translateY(0);
-  opacity: 1;
-  font-size: 1.35rem;
-  font-weight: 700;
   color: #ffffff;
-  letter-spacing: -0.01em;
-  text-shadow:
-    0 0 20px rgba(255, 255, 255, 0.4),
-    0 0 40px rgba(255, 255, 255, 0.2),
-    0 2px 15px rgba(255, 255, 255, 0.25);
-  pointer-events: auto;
+  font-weight: 700;
+  font-size: 1.35rem;
 }
 
-/* NEXT LINE - Bottom position, faded */
+/* FUTURE LINES - Slightly brighter than past */
+.lyric-line.lyric-future {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+}
+
+/* Legacy classes for backwards compatibility */
+.lyric-line.lyric-prev {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 500;
+}
+
 .lyric-line.lyric-next {
-  transform: translateX(-50%) translateY(60px);
-  opacity: 0.5;
-  font-size: 0.95rem;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.45);
-  pointer-events: auto;
-}
-
-/* EXIT STATE - Slide up and fade out */
-.lyric-line.lyric-exit {
-  transform: translateX(-50%) translateY(-120px);
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* ENTER STATE - Start below, ready to slide in */
-.lyric-line.lyric-enter {
-  transform: translateX(-50%) translateY(120px);
-  opacity: 0;
-  pointer-events: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
 }
 
 /* ==================== HOVER STATES ==================== */
-.lyric-line.lyric-prev:hover,
-.lyric-line.lyric-next:hover {
-  color: rgba(255, 255, 255, 0.7);
-  opacity: 0.7;
+.lyric-line:hover {
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .lyric-line.lyric-current:hover {
@@ -1077,92 +1060,40 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: rgba(0, 0, 0, 0.92);
   background-size: cover;
   background-position: center;
   overflow: hidden;
 }
 
-.lyrics-fullscreen-display {
-  position: relative;
-  z-index: 1;
-  width: 90vw;
-  max-width: 1200px;
-  height: 70vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(1rem, 2vw, 2rem);
-  overflow: hidden;
-  padding: 2rem;
-}
-
-/* Fullscreen lyric lines */
-.lyrics-fullscreen-display .lyric-line {
-  padding: clamp(0.75rem, 1.5vw, 1.5rem) 2rem;
-  font-size: clamp(1.25rem, 3vw, 2rem);
-  font-weight: 400;
+/* Fullscreen lyric lines - Apple Music style */
+.fullscreen-lyric-line {
+  padding: 8px 0;
+  font-size: 28px;
+  font-weight: 600;
   line-height: 1.5;
-  letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.45);
   cursor: pointer;
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: scale(1);
-  max-width: 100%;
-  margin: 0;
-  opacity: 1;
-  text-align: center;
-  width: auto;
+  transition: all 0.3s ease;
+  text-align: left;
 }
 
-.lyrics-fullscreen-display .lyric-line:hover {
-  color: rgba(255, 255, 255, 0.65);
-  transform: scale(1.03);
+.fullscreen-lyric-line:hover {
+  color: rgba(255, 255, 255, 0.7);
 }
 
-.lyrics-fullscreen-display .lyric-line.current {
+.fullscreen-lyric-line.current {
   color: #ffffff;
-  font-size: clamp(2rem, 5vw, 4.5rem);
+  font-size: 32px;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  transform: scale(1);
-  text-shadow:
-    0 0 20px rgba(255, 255, 255, 0.4),
-    0 0 40px rgba(255, 255, 255, 0.2),
-    0 4px 30px rgba(0, 0, 0, 0.5);
-  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-  animation: lyric-glow 2s ease-in-out infinite;
 }
 
-@keyframes lyric-glow {
-
-  0%,
-  100% {
-    text-shadow:
-      0 0 20px rgba(255, 255, 255, 0.4),
-      0 0 40px rgba(255, 255, 255, 0.2),
-      0 4px 30px rgba(0, 0, 0, 0.5);
-  }
-
-  50% {
-    text-shadow:
-      0 0 30px rgba(255, 255, 255, 0.6),
-      0 0 60px rgba(255, 255, 255, 0.3),
-      0 4px 40px rgba(0, 0, 0, 0.6);
-  }
+.fullscreen-lyric-line.past {
+  color: rgba(255, 255, 255, 0.35);
 }
 
-.lyrics-fullscreen-display .lyric-line.past {
-  color: rgba(255, 255, 255, 0.25);
-  font-size: clamp(1rem, 2.5vw, 1.75rem);
-  transform: scale(0.95);
-}
-
-.lyrics-fullscreen-display .lyric-line.future {
-  color: rgba(255, 255, 255, 0.4);
-  font-size: clamp(1.125rem, 2.75vw, 2rem);
-  transform: scale(0.98);
+.fullscreen-lyric-line.future {
+  color: rgba(255, 255, 255, 0.45);
 }
 
 /* Exit hint */

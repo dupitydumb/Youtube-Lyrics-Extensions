@@ -9,7 +9,9 @@
   ],
   "host_permissions": [
     "https://lrclib.net/*",
-    "https://apic-desktop.musixmatch.com/*"
+    "https://apic-desktop.musixmatch.com/*",
+    "https://api.deezer.com/*",
+    "https://www.deezer.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -56,7 +58,8 @@
         "modules/fullscreen.js",
         "modules/main.js",
         "modules/romanization.js",
-        "modules/AlternativeProvider/musicmatch.js"
+        "modules/AlternativeProvider/musicmatch.js",
+        "modules/AlternativeProvider/deezer.js"
       ],
       "matches": [
         "*://*.youtube.com/*"

@@ -52,6 +52,13 @@ export class LyricsSync {
 
     const adjustedTime = currentTime + (this.delay / 1000);
 
+    // Check if we've passed the last lyric by a reasonable duration
+    // If more than 10 seconds have passed since the last lyric, consider the song finished
+    const lastLyric = this.syncedLyrics[this.syncedLyrics.length - 1];
+    if (lastLyric && adjustedTime > lastLyric.time + 10) {
+      return null;
+    }
+
     // Start from last known position for better performance
     // Most of the time, we're moving forward sequentially
     if (this.lastKnownIndex >= 0 && this.lastKnownIndex < this.syncedLyrics.length) {

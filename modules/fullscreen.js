@@ -2,6 +2,8 @@
  * Fullscreen Module - Handles fullscreen karaoke mode
  */
 
+import { ColorExtractor } from './color-utils.js';
+
 export class FullscreenManager {
   constructor(backgroundManager) {
     this.backgroundManager = backgroundManager;
@@ -72,7 +74,7 @@ export class FullscreenManager {
     `;
     this.overlay.appendChild(style);
 
-    // Add background
+    // Add background with gradient extracted from album art
     const bgContainer = document.createElement('div');
     bgContainer.id = 'fullscreen-background';
     bgContainer.style.cssText = `
@@ -85,8 +87,13 @@ export class FullscreenManager {
       overflow: hidden;
     `;
 
-    if (this.backgroundManager) {
+    // Extract colors from album art and create Apple Music-style gradient
+    if (imageUrl) {
+      this.setupGradientBackground(bgContainer, imageUrl);
+    } else if (this.backgroundManager) {
       this.backgroundManager.updateFullscreenBackground(bgContainer, imageUrl);
+    } else {
+      bgContainer.style.background = 'linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%)';
     }
 
     this.overlay.appendChild(bgContainer);
@@ -344,8 +351,51 @@ export class FullscreenManager {
     if (!this.isActive) return;
 
     const bgContainer = document.getElementById('fullscreen-background');
-    if (bgContainer && this.backgroundManager) {
-      this.backgroundManager.updateFullscreenBackground(bgContainer, imageUrl);
+    if (bgContainer) {
+      if (imageUrl) {
+        this.setupGradientBackground(bgContainer, imageUrl);
+      } else if (this.backgroundManager) {
+        this.backgroundManager.updateFullscreenBackground(bgContainer, imageUrl);
+      }
+    }
+  }
+
+  /**
+   * Setup Apple Music-style gradient background from album art colors
+   */
+  async setupGradientBackground(container, imageUrl) {
+    // Set a dark fallback first
+    container.style.background = 'linear-gradient(180deg, #2a2a2a 0%, #0a0a0a 100%)';
+    
+    try {
+      const colors = await ColorExtractor.extractDominantColors(imageUrl, 3);
+      if (colors && colors.length > 0) {
+        // Create vertical gradient like Apple Music (color at top fading to dark at bottom)
+        const primaryColor = colors[0];
+        const secondaryColor = colors[1] || colors[0];
+        
+        // Parse RGB values
+        const parseRgb = (rgbStr) => {
+          const match = rgbStr.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+          if (match) return { r: parseInt(match[1]), g: parseInt(match[2]), b: parseInt(match[3]) };
+          return { r: 30, g: 30, b: 30 };
+        };
+        
+        const primary = parseRgb(primaryColor);
+        const secondary = parseRgb(secondaryColor);
+        
+        // Create Apple Music style gradient - vibrant at top, dark at bottom
+        container.style.background = `linear-gradient(
+          180deg, 
+          rgba(${primary.r}, ${primary.g}, ${primary.b}, 0.9) 0%,
+          rgba(${Math.floor(primary.r * 0.6)}, ${Math.floor(primary.g * 0.6)}, ${Math.floor(primary.b * 0.6)}, 0.85) 30%,
+          rgba(${Math.floor(secondary.r * 0.3)}, ${Math.floor(secondary.g * 0.3)}, ${Math.floor(secondary.b * 0.3)}, 0.9) 70%,
+          rgba(10, 10, 12, 0.98) 100%
+        )`;
+        container.style.transition = 'background 0.5s ease';
+      }
+    } catch (error) {
+      console.warn('Failed to extract colors for fullscreen background:', error);
     }
   }
 
@@ -363,7 +413,9 @@ export class FullscreenManager {
     // Create wrapper for proper centering and scrolling
     const wrapper = document.createElement('div');
     wrapper.id = 'fullscreen-lyrics-wrapper';
-
+    // Add padding to allow first/last lyrics to scroll to center
+    wrapper.style.paddingTop = '40vh';
+    wrapper.style.paddingBottom = '40vh';
 
     lyrics.forEach((lyric, index) => {
       const lyricLine = document.createElement('div');
@@ -371,18 +423,17 @@ export class FullscreenManager {
       lyricLine.dataset.index = index;
       lyricLine.dataset.time = lyric.time;
 
+      // Apple Music style - simple, clean, left-aligned
       Object.assign(lyricLine.style, {
-        padding: '20px 30px',
-        fontSize: '32px',
-        lineHeight: '1.8',
-        color: 'rgba(255, 255, 255, 0.5)',
-        transition: 'all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-        transform: 'translateZ(0)',
-        fontWeight: '400',
-        textAlign: 'center',
+        padding: '12px 0',
+        fontSize: '28px',
+        lineHeight: '1.5',
+        color: 'rgba(255, 255, 255, 0.45)',
+        transition: 'all 0.3s ease',
+        fontWeight: '600',
+        textAlign: 'left',
         cursor: 'pointer',
-        willChange: 'font-size, color, filter, transform',
-        filter: 'blur(1.2px)' // Future lines start blurred
+        letterSpacing: '-0.01em'
       });
 
       // Word-level timing: render each word and optional per-word romanization
@@ -519,60 +570,53 @@ export class FullscreenManager {
             line.classList.add('current');
             line.classList.remove('past', 'future');
 
-            // Remove any previous animation classes
-            line.style.animation = 'none';
-            // Trigger reflow to restart animation
-            void line.offsetWidth;
-            // Apply Apple Music-style bounce animation
-            line.style.animation = 'lyric-bounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
-
-            // Use Object.assign instead of cssText to preserve inheritance
+            // Apple Music style - bold white, no blur, no glow
             Object.assign(line.style, {
               color: '#ffffff',
-              fontSize: '48px',
+              fontSize: '32px',
               fontWeight: '700',
-              transform: 'translateZ(0)',
-              textShadow: '0 0 20px rgba(255, 255, 255, 0.5), 0 2px 12px rgba(255, 255, 255, 0.3)',
-              padding: '20px 30px',
-              lineHeight: '1.8',
-              textAlign: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease',
-              opacity: '1',
-              willChange: 'font-size, color, filter, transform',
-              filter: 'blur(0px)', // Remove blur for current line
+              textAlign: 'left',
+              transition: 'all 0.3s ease',
+              letterSpacing: '-0.01em'
             });
 
-            // Force bright, fully opaque color to override page/global CSS
+            // Force color override
             try {
               line.style.setProperty('color', '#ffffff', 'important');
-              line.style.setProperty('opacity', '1', 'important');
             } catch (e) { }
 
-            // Ensure inner elements (original text and romanization) are fully visible
+            // Ensure inner elements are fully visible
             const orig = line.querySelector('.fullscreen-original-text');
             if (orig) {
               orig.style.color = '#ffffff';
-              orig.style.opacity = '1';
-              try { orig.style.setProperty('color', '#ffffff', 'important'); orig.style.setProperty('opacity', '1', 'important'); } catch (e) { }
             }
             const romanElems = line.querySelectorAll('.fullscreen-romanization, .word-romanization');
             romanElems.forEach(el => {
-              el.style.color = '#ffffff';
-              el.style.opacity = '1';
-              try { el.style.setProperty('color', '#ffffff', 'important'); el.style.setProperty('opacity', '1', 'important'); } catch (e) { }
+              el.style.color = 'rgba(255, 255, 255, 0.9)';
             });
+            
+            // Only set all words to white in LINE mode
+            // In WORD mode, let word-level highlighting handle colors
             const wordSpans = line.querySelectorAll('.lyric-word');
-            wordSpans.forEach(w => {
-              w.style.color = '#ffffff';
-              w.style.fontWeight = '600';
-              w.style.transform = 'scale(1) translateZ(0)';
-              w.style.textShadow = '0 2px 12px rgba(255,255,255,0.25)';
-              w.style.filter = 'blur(0px)';
-              try { w.style.setProperty('color', '#ffffff', 'important'); w.style.setProperty('opacity', '1', 'important'); } catch (e) { }
-            });
+            if (this.highlightMode === 'line') {
+              wordSpans.forEach(w => {
+                w.style.color = '#ffffff';
+                w.style.fontWeight = '700';
+              });
+            } else {
+              // In word mode, set initial state for words on current line
+              // Past/current words will be updated by word-level highlighting
+              // Future words should be dimmed
+              wordSpans.forEach(w => {
+                const wordState = w.dataset.state || 'future';
+                if (wordState === 'future') {
+                  w.style.color = 'rgba(255, 255, 255, 0.4)';
+                  w.style.fontWeight = '500';
+                }
+              });
+            }
 
-            // Debounced scroll - only on index change
+            // Smooth scroll to center current line
             if (!this._scrollTimeout) {
               const containerRect = this.lyricsContainer.getBoundingClientRect();
               const lineRect = line.getBoundingClientRect();
@@ -598,40 +642,36 @@ export class FullscreenManager {
               line.classList.remove('past');
             }
 
-            const fadedColor = isPast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.5)';
-            const blurAmount = isPast ? '0.8px' : '1.2px';
+            // Apple Music style - dimmed text, no blur
+            const fadedColor = isPast ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.45)';
 
             Object.assign(line.style, {
-              fontSize: '32px',
-              fontWeight: '400',
-              transform: 'translateZ(0)',
-              textShadow: 'none',
+              fontSize: '28px',
+              fontWeight: '600',
               color: fadedColor,
-              transition: 'all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.4s ease',
-              willChange: 'font-size, color, filter',
-              filter: `blur(${blurAmount})`, // Apply blur to past/future lines
-              animation: 'none'
+              transition: 'all 0.3s ease',
+              textAlign: 'left',
+              letterSpacing: '-0.01em'
             });
 
             // Dim inner elements for non-current lines
             const orig2 = line.querySelector('.fullscreen-original-text');
             if (orig2) {
-              orig2.style.color = 'rgba(255,255,255,0.6)';
-              orig2.style.opacity = '0.9';
+              orig2.style.color = fadedColor;
             }
             const romanElems2 = line.querySelectorAll('.fullscreen-romanization, .word-romanization');
             romanElems2.forEach(el => {
-              el.style.color = 'rgba(255,255,255,0.7)';
-              el.style.opacity = '0.9';
+              el.style.color = 'rgba(255,255,255,0.5)';
             });
             const wordSpans2 = line.querySelectorAll('.lyric-word');
             wordSpans2.forEach(w => {
-              w.style.color = 'rgba(255,255,255,0.6)';
-              w.style.fontWeight = '400';
-              w.style.transform = 'scale(1) translateZ(0)';
+              w.style.color = fadedColor;
+              w.style.fontWeight = '600';
+              // Clear any word-level highlighting state
+              w.classList.remove('highlighted', 'active');
+              w.classList.add(isPast ? 'past' : 'future');
               w.style.textShadow = 'none';
-              w.style.filter = 'blur(0px)';
-              w.style.animation = 'none';
+              w.style.transform = 'scale(1) translateZ(0)';
             });
           }
         });
@@ -695,8 +735,8 @@ export class FullscreenManager {
               newState = 'future';
             }
 
-            // Only write to DOM if state changed or it's the active word (for dynamic animation)
-            if (currentState !== newState || newState === 'active') {
+            // Only write to DOM if state changed, it's the active word, or line just changed
+            if (currentState !== newState || newState === 'active' || indexChanged) {
               word.dataset.state = newState;
 
               if (newState === 'active') { // Active word - spring animation

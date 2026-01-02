@@ -13,6 +13,7 @@ import { EventBus, EVENTS } from './events.js';
 import { FILTER_WORDS } from './constants.js';
 import { Romanizer } from './romanization.js';
 import { Musixmatch } from './AlternativeProvider/musicmatch.js';
+import { Deezer } from './AlternativeProvider/deezer.js';
 
 class YouTubeLyricsApp {
   constructor() {
@@ -33,7 +34,8 @@ class YouTubeLyricsApp {
     // Listen for responses from the content script bridge
     window.addEventListener('message', (event) => {
       if (event.source !== window) return;
-      if (event.data && event.data.type === 'MUSIXMATCH_FETCH_RESPONSE') {
+      // Handle both Musixmatch and generic provider fetch responses
+      if (event.data && (event.data.type === 'MUSIXMATCH_FETCH_RESPONSE' || event.data.type === 'PROVIDER_FETCH_RESPONSE')) {
         const requestId = event.data.requestId;
         const handler = pendingRequests.get(requestId);
         if (handler) {
@@ -55,6 +57,7 @@ class YouTubeLyricsApp {
       }
     });
 
+    // Background fetch for Musixmatch (GET only, uses MUSIXMATCH message type)
     const backgroundFetch = (url) => {
       return new Promise((resolve, reject) => {
         const requestId = ++requestCounter;
@@ -77,11 +80,37 @@ class YouTubeLyricsApp {
       });
     };
 
+    // Generic provider fetch that supports GET and POST with options
+    const providerFetch = (url, options = {}) => {
+      return new Promise((resolve, reject) => {
+        const requestId = ++requestCounter;
+        pendingRequests.set(requestId, { resolve, reject });
+
+        // Send request to content script bridge via postMessage
+        window.postMessage({
+          type: 'PROVIDER_FETCH_REQUEST',
+          requestId: requestId,
+          url: url,
+          options: options
+        }, '*');
+
+        // Timeout after 30 seconds
+        setTimeout(() => {
+          if (pendingRequests.has(requestId)) {
+            pendingRequests.delete(requestId);
+            reject(new Error('Request timeout'));
+          }
+        }, 30000);
+      });
+    };
+
     this.musixmatch = new Musixmatch(null, true, backgroundFetch); // Enhanced mode with custom fetch
+    this.deezer = new Deezer(providerFetch); // Deezer provider with generic fetch that supports POST
 
     this.currentVideoInfo = null;
     this.currentLyrics = null;
     this.albumArtUrl = null;
+    this.currentProvider = null; // Track which provider supplied the lyrics
   }
 
   /**
@@ -449,10 +478,17 @@ class YouTubeLyricsApp {
       // PRIORITY 1: Try Musixmatch first with different strategies
       let musixmatchResult = null;
       let successfulStrategy = null;
+      let musixmatchRateLimited = false; // Track if Musixmatch is rate limited
 
       for (const strategy of strategies) {
         if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
           continue;
+        }
+
+        // If Musixmatch is rate limited, skip remaining strategies
+        if (musixmatchRateLimited) {
+          console.log(`[Musixmatch] Skipping strategy ${strategy.name} due to rate limit, moving to fallback...`);
+          break;
         }
 
         try {
@@ -467,22 +503,66 @@ class YouTubeLyricsApp {
           }
         } catch (error) {
           console.log(`[Musixmatch] Strategy ${strategy.name} failed:`, error.message);
+          // Check if this is a rate limit/token error - if so, skip remaining Musixmatch strategies
+          if (error.message.includes('token') || error.message.includes('401') || error.message.includes('rate') || error.message.includes('retries')) {
+            console.log('[Musixmatch] Rate limited or token error detected, skipping remaining strategies...');
+            musixmatchRateLimited = true;
+          }
           continue;
         }
       }
 
       // If Musixmatch found lyrics, process them
       if (musixmatchResult && musixmatchResult.synced) {
-        this.processMusixmatchResults(
+        this.currentProvider = 'Musixmatch';
+        this.processProviderResults(
           musixmatchResult,
           videoInfo,
           successfulStrategy ? successfulStrategy.songName : videoInfo.title,
-          successfulStrategy ? successfulStrategy.artistName : videoInfo.artist
+          successfulStrategy ? successfulStrategy.artistName : videoInfo.artist,
+          'Musixmatch'
         );
         return;
       }
 
-      // PRIORITY 2: Fall back to LRCLIB API
+      // PRIORITY 2: Try Deezer as fallback
+      console.log('[Deezer] Trying Deezer as fallback...');
+      let deezerResult = null;
+
+      for (const strategy of strategies) {
+        if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
+          continue;
+        }
+
+        try {
+          console.log(`[Deezer] Trying strategy: ${strategy.name} with query: "${strategy.query}"`);
+          deezerResult = await this.deezer.getLrc(strategy.query);
+
+          if (deezerResult && deezerResult.synced) {
+            console.log(`[Deezer] Found lyrics with strategy: ${strategy.name}`);
+            successfulStrategy = strategy;
+            break;
+          }
+        } catch (error) {
+          console.log(`[Deezer] Strategy ${strategy.name} failed:`, error.message);
+          continue;
+        }
+      }
+
+      // If Deezer found lyrics, process them
+      if (deezerResult && deezerResult.synced) {
+        this.currentProvider = 'Deezer';
+        this.processProviderResults(
+          deezerResult,
+          videoInfo,
+          successfulStrategy ? successfulStrategy.songName : videoInfo.title,
+          successfulStrategy ? successfulStrategy.artistName : videoInfo.artist,
+          'Deezer'
+        );
+        return;
+      }
+
+      // PRIORITY 3: Fall back to LRCLIB API
       console.log('[LRCLIB] Falling back to LRCLIB API...');
       let results = null;
 
@@ -510,11 +590,13 @@ class YouTubeLyricsApp {
       }
 
       // Process results with enhanced metadata
+      this.currentProvider = 'LRCLIB';
       this.processLyricsResults(
         results,
         videoInfo,
         successfulStrategy ? successfulStrategy.songName : videoInfo.title,
-        successfulStrategy ? successfulStrategy.artistName : videoInfo.artist
+        successfulStrategy ? successfulStrategy.artistName : videoInfo.artist,
+        'LRCLIB'
       );
 
     } catch (error) {
@@ -524,30 +606,38 @@ class YouTubeLyricsApp {
   }
 
   /**
-   * Process Musixmatch lyrics results
+   * Process lyrics results from any provider (Musixmatch, Deezer, etc.)
+   * @param {object} result - Lyrics result with synced property
+   * @param {object} videoInfo - Video information
+   * @param {string} songName - Song name
+   * @param {string} artistName - Artist name
+   * @param {string} providerName - Name of the provider (e.g., 'Musixmatch', 'Deezer')
    */
-  async processMusixmatchResults(musixmatchResult, videoInfo, songName = '', artistName = '') {
+  async processProviderResults(result, videoInfo, songName = '', artistName = '', providerName = 'Unknown') {
     // Parse synced lyrics from LRC format
-    const syncedLyrics = this.api.parseSyncedLyrics(musixmatchResult.synced);
+    const syncedLyrics = this.api.parseSyncedLyrics(result.synced);
 
     if (!syncedLyrics || syncedLyrics.length === 0) {
       // Fall back to LRCLIB if parsing failed
-      console.log('[Musixmatch] Failed to parse lyrics, falling back to LRCLIB...');
+      console.log(`[${providerName}] Failed to parse lyrics, falling back to LRCLIB...`);
       return this.loadLyricsFromLRCLIB(videoInfo, songName, artistName);
     }
+
+    // Store provider name
+    this.currentProvider = providerName;
 
     // Attach romanization if enabled
     const withRoman = this.applyRomanizationIfNeeded(syncedLyrics);
     this.currentLyrics = withRoman;
 
-    // Update title and artist in header
-    this.ui.updateTitle(songName || videoInfo.title, artistName || videoInfo.artist);
+    // Update title, artist, and provider attribution in header
+    this.ui.updateTitle(songName || videoInfo.title, artistName || videoInfo.artist, providerName);
 
-    // Check if we have word-level timings
+    // Check if we have word-level timings (prioritize word-by-word sync)
     const hasWordTimings = syncedLyrics.some(line => line.words && line.words.length > 0);
 
     if (hasWordTimings) {
-      console.log('[Musixmatch] Word-level timings detected, switching to WORD mode');
+      console.log(`[${providerName}] Word-level timings detected, switching to WORD mode`);
       // Update internal state, settings, and UI
       this.highlightMode = 'word';
       this.settings.set('highlightMode', 'word');
@@ -587,7 +677,7 @@ class YouTubeLyricsApp {
       this.ui.updateAlbumCover(this.albumArtUrl, showInPanel);
     }
 
-    console.log('[Musixmatch] Successfully loaded lyrics');
+    console.log(`[${providerName}] Successfully loaded lyrics`);
   }
 
   /**
@@ -619,13 +709,14 @@ class YouTubeLyricsApp {
       return;
     }
 
-    this.processLyricsResults(results, videoInfo, songName, artistName);
+    this.currentProvider = 'LRCLIB';
+    this.processLyricsResults(results, videoInfo, songName, artistName, 'LRCLIB');
   }
 
   /**
    * Process lyrics results
    */
-  async processLyricsResults(results, videoInfo, songName = '', artistName = '') {
+  async processLyricsResults(results, videoInfo, songName = '', artistName = '', providerName = 'LRCLIB') {
     // Find best match with enhanced fuzzy matching
     const bestMatch = this.api.findBestMatch(
       results,
@@ -645,8 +736,8 @@ class YouTubeLyricsApp {
       const withRoman = this.applyRomanizationIfNeeded(syncedLyrics);
       this.currentLyrics = withRoman;
 
-      // Update title and artist in header
-      this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist);
+      // Update title, artist, and provider in header
+      this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist, providerName);
 
       // Check if we have word-level timings and auto-switch to word mode
       const hasWordTimings = syncedLyrics.some(line => line.words && line.words.length > 0);
@@ -689,8 +780,8 @@ class YouTubeLyricsApp {
       }
 
     } else if (bestMatch.plainLyrics) {
-      // Update title and artist in header
-      this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist);
+      // Update title, artist, and provider in header
+      this.ui.updateTitle(bestMatch.trackName || videoInfo.title, bestMatch.artistName || videoInfo.artist, providerName);
 
       // Display plain lyrics
       const plain = bestMatch.plainLyrics;

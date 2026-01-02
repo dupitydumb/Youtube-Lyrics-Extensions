@@ -94,8 +94,8 @@ export class LyricsUI {
   }
 
   /**
-   * Perform the actual DOM updates — simplified 3-line display
-   * Shows only: previous, current, and next lyrics
+   * Perform the actual DOM updates — Apple Music scrollable display
+   * Shows all lyrics with current line highlighted and scrolled into view
    */
   performUpdate(currentIndex, currentTime = null, indexChanged = true) {
     if (!this.lyricsContainer) return;
@@ -109,23 +109,25 @@ export class LyricsUI {
     if (total === 0) return;
 
     // Define position class constants
-    const CLASSES = ['lyric-prev', 'lyric-current', 'lyric-next', 'lyric-exit', 'lyric-enter'];
+    const CLASSES = ['lyric-past', 'lyric-current', 'lyric-future', 'lyric-prev', 'lyric-next', 'lyric-exit', 'lyric-enter', 'current', 'past', 'future'];
 
-    // Calculate indices for 3-line display
-    const prevIndex = currentIndex > 0 ? currentIndex - 1 : -1;
-    const nextIndex = currentIndex < total - 1 ? currentIndex + 1 : -1;
-
-    // Update all lines - remove old classes and apply new ones
+    // Update all lines with past/current/future states
     for (let i = 0; i < total; i++) {
       const line = lyricLines[i];
       if (!line) continue;
 
       // Remove all position classes first
-      line.classList.remove(...CLASSES, 'current', 'past', 'future');
+      line.classList.remove(...CLASSES);
 
-      // Apply appropriate position class
-      if (i === prevIndex) {
-        line.classList.add('lyric-prev');
+      // Apply appropriate state class
+      if (i < currentIndex) {
+        line.classList.add('lyric-past');
+        // Clear word highlighting for past lines
+        const wordsOnLine = line.querySelectorAll('.lyric-word');
+        wordsOnLine.forEach(w => {
+          w.classList.remove('highlighted', 'future');
+          w.classList.add('past');
+        });
       } else if (i === currentIndex) {
         line.classList.add('lyric-current');
 
@@ -137,17 +139,40 @@ export class LyricsUI {
             w.classList.remove('future', 'past');
             w.classList.add('highlighted');
           });
+        } else {
+          // In word mode, initialize all words as future (dimmed)
+          // The updateWordHighlight function will highlight the current word
+          wordsOnLine.forEach(w => {
+            w.classList.remove('highlighted');
+            // Don't set future class here - let updateWordHighlight handle proper state
+          });
         }
-        // In word mode, don't set highlighted here - let updateWordHighlight handle it
-      } else if (i === nextIndex) {
-        line.classList.add('lyric-next');
+
+        // Scroll current line into view (centered) on index change
+        if (indexChanged && this._lastScrollIndex !== currentIndex) {
+          this._lastScrollIndex = currentIndex;
+          // Use smooth scroll to center the current line
+          requestAnimationFrame(() => {
+            line.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center'
+            });
+          });
+        }
+      } else {
+        line.classList.add('lyric-future');
+        // Clear word highlighting for future lines
+        const wordsOnLine = line.querySelectorAll('.lyric-word');
+        wordsOnLine.forEach(w => {
+          w.classList.remove('highlighted', 'past');
+          w.classList.add('future');
+        });
       }
-      // Lines outside prev/current/next remain hidden (no class = invisible via CSS)
     }
 
     // Update visible range tracking
-    this._visibleRange.start = Math.max(0, currentIndex - 1);
-    this._visibleRange.end = Math.min(total - 1, currentIndex + 1);
+    this._visibleRange.start = 0;
+    this._visibleRange.end = total - 1;
 
     // Word-level updates for current line
     if (currentTime !== null && this.highlightMode === 'word') {
@@ -228,106 +253,111 @@ export class LyricsUI {
       top: '0',
       zIndex: '100',
       marginBottom: '16px',
-      borderRadius: '12px',
+      borderRadius: '16px',
       overflow: 'hidden',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+      boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4)'
     });
   }
 
   /**
-   * Apply Apple Music-inspired panel styles
+   * Apply Apple Music-inspired panel styles - dark translucent overlay
    */
   applyPanelStyles(element) {
-    const styles = UI_CONFIG.APPLE_MUSIC_STYLE;
     Object.assign(element.style, {
       position: 'relative',
       zIndex: '2',
-      background: styles.BACKGROUND_COLOR,
-      backdropFilter: `blur(${styles.BACKDROP_BLUR})`,
-      WebkitBackdropFilter: `blur(${styles.BACKDROP_BLUR})`,
-      padding: '24px',
+      background: 'rgba(20, 20, 22, 0.92)',
+      backdropFilter: 'blur(40px)',
+      WebkitBackdropFilter: 'blur(40px)',
+      padding: '16px 20px',
       color: '#ffffff',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      maxHeight: '600px',
+      maxHeight: '520px',
       display: 'flex',
       flexDirection: 'column',
-      gap: '16px'
+      gap: '8px'
     });
   }
 
   /**
-   * Apply lyrics container styles - 3-line display
+   * Apply lyrics container styles - Apple Music scrollable display
    */
   applyLyricsContainerStyles(element) {
     Object.assign(element.style, {
       flex: '1',
-      overflow: 'hidden',
-      padding: '1.5rem 1rem',
-      textAlign: 'center',
+      overflowY: 'auto',
+      overflowX: 'hidden',
+      padding: '1rem 1.5rem',
+      textAlign: 'left',
       display: 'flex',
       flexDirection: 'column',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '180px',
-      maxHeight: '220px',
-      position: 'relative'
+      justifyContent: 'flex-start',
+      alignItems: 'stretch',
+      minHeight: '280px',
+      maxHeight: '400px',
+      position: 'relative',
+      scrollBehavior: 'smooth',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+      gap: '0.25rem'
     });
 
-    // 3-line display styles with !important to override conflicts
+    // Apple Music scrollable display styles
     const style = document.createElement('style');
     style.textContent = `
-      /* ===== 3-LINE DISPLAY SYSTEM ===== */
+      /* ===== APPLE MUSIC SCROLLABLE DISPLAY ===== */
       
-      /* Base line - hidden by default */
+      /* Hide scrollbar */
+      #lyrics-display::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+      
+      /* Base line styles */
       #lyrics-display .lyric-line {
-        position: absolute !important;
-        left: 50% !important;
-        transform: translateX(-50%) translateY(100px) !important;
-        opacity: 0 !important;
-        padding: 0.5rem 1.5rem !important;
-        font-size: 1rem !important;
-        font-weight: 400 !important;
-        color: rgba(255, 255, 255, 0.5) !important;
-        max-width: 95% !important;
-        text-align: center !important;
-        pointer-events: none !important;
-        transition: transform 0.4s ease, opacity 0.4s ease, font-size 0.4s ease, color 0.3s ease !important;
-      }
-      
-      /* PREVIOUS LINE - top */
-      #lyrics-display .lyric-line.lyric-prev {
-        transform: translateX(-50%) translateY(-50px) !important;
-        opacity: 0.5 !important;
-        font-size: 0.95rem !important;
-        color: rgba(255, 255, 255, 0.45) !important;
-        pointer-events: auto !important;
-      }
-      
-      /* CURRENT LINE - center */
-      #lyrics-display .lyric-line.lyric-current {
-        transform: translateX(-50%) translateY(0) !important;
-        opacity: 1 !important;
+        position: relative !important;
+        padding: 0.75rem 1rem !important;
         font-size: 1.25rem !important;
-        font-weight: 700 !important;
-        color: #ffffff !important;
-        text-shadow: 0 0 20px rgba(255, 255, 255, 0.4) !important;
-        pointer-events: auto !important;
-      }
-      
-      /* NEXT LINE - bottom */
-      #lyrics-display .lyric-line.lyric-next {
-        transform: translateX(-50%) translateY(50px) !important;
-        opacity: 0.5 !important;
-        font-size: 0.95rem !important;
+        font-weight: 500 !important;
+        line-height: 1.6 !important;
         color: rgba(255, 255, 255, 0.45) !important;
-        pointer-events: auto !important;
+        text-align: left !important;
+        border-radius: 8px !important;
+        transition: color 0.3s ease, font-weight 0.3s ease !important;
+        cursor: pointer !important;
       }
       
-      /* Word highlighting - Increased specificity to override line styles */
-      #lyrics-display .lyric-word { display: inline; transition: color 0.1s ease; }
-      #lyrics-display .lyric-word.highlighted { color: #ffffff !important; font-weight: 700 !important; opacity: 1 !important; }
-      #lyrics-display .lyric-word.past { color: rgba(255, 255, 255, 0.6) !important; opacity: 1 !important; font-weight: 400 !important; }
-      #lyrics-display .lyric-word.future { color: rgba(255, 255, 255, 0.35) !important; opacity: 1 !important; font-weight: 400 !important; }
+      /* Past lines - dimmer */
+      #lyrics-display .lyric-line.lyric-past {
+        color: rgba(255, 255, 255, 0.35) !important;
+      }
+      
+      /* Current line - bold white */
+      #lyrics-display .lyric-line.lyric-current {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-size: 1.35rem !important;
+      }
+      
+      /* Future lines */
+      #lyrics-display .lyric-line.lyric-future {
+        color: rgba(255, 255, 255, 0.5) !important;
+      }
+      
+      /* Hover effect */
+      #lyrics-display .lyric-line:hover {
+        color: rgba(255, 255, 255, 0.75) !important;
+      }
+      #lyrics-display .lyric-line.lyric-current:hover {
+        color: #ffffff !important;
+      }
+      
+      /* Word highlighting */
+      #lyrics-display .lyric-word { display: inline; transition: color 0.15s ease; }
+      #lyrics-display .lyric-word.highlighted { color: #ffffff !important; font-weight: 700 !important; }
+      #lyrics-display .lyric-word.past { color: rgba(255, 255, 255, 0.5) !important; font-weight: 500 !important; }
+      #lyrics-display .lyric-word.future { color: rgba(255, 255, 255, 0.35) !important; font-weight: 400 !important; }
       
       /* Title visibility */
       #song-title, #song-artist { opacity: 1 !important; visibility: visible !important; }
@@ -338,31 +368,31 @@ export class LyricsUI {
   }
 
   /**
-   * Create header with title and close button
+   * Create header with title and close button - Apple Music compact style
    */
   createHeader() {
     const header = document.createElement('div');
     header.id = 'lyrics-header-container';
     Object.assign(header.style, {
       display: 'flex',
-      justifyContent: 'center',
+      justifyContent: 'flex-start',
       alignItems: 'center',
-      gap: '1rem',
-      paddingBottom: '16px',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+      gap: '12px',
+      paddingBottom: '12px',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
       zIndex: '100'
     });
 
-    // Album cover (optional, will be shown later when updateAlbumCover is called)
+    // Album cover - compact size like Apple Music mobile
     const albumCover = document.createElement('img');
     albumCover.id = 'panel-album-cover';
     albumCover.alt = 'Album Cover';
     albumCover.style.cssText = `
-      width: 80px;
-      height: 80px;
+      width: 48px;
+      height: 48px;
       object-fit: cover;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       display: none;
       flex-shrink: 0;
     `;
@@ -370,8 +400,9 @@ export class LyricsUI {
     const titleContainer = document.createElement('div');
     titleContainer.id = 'lyrics-title';
     Object.assign(titleContainer.style, {
-      textAlign: 'center',
-      flex: '1'
+      textAlign: 'left',
+      flex: '1',
+      minWidth: '0'
     });
 
     const title = document.createElement('h3');
@@ -379,7 +410,7 @@ export class LyricsUI {
     title.textContent = 'Lyrics';
     title.style.cssText = `
       margin: 0 !important;
-      font-size: 18px !important;
+      font-size: 15px !important;
       font-weight: 600 !important;
       color: #ffffff !important;
       overflow: hidden !important;
@@ -387,24 +418,43 @@ export class LyricsUI {
       white-space: nowrap !important;
       opacity: 1 !important;
       visibility: visible !important;
+      line-height: 1.3 !important;
     `;
 
     const artist = document.createElement('p');
     artist.id = 'song-artist';
     artist.textContent = '';
     artist.style.cssText = `
-      margin: 4px 0 0 0 !important;
-      font-size: 14px !important;
-      color: rgba(255, 255, 255, 0.6) !important;
+      margin: 2px 0 0 0 !important;
+      font-size: 13px !important;
+      color: rgba(255, 255, 255, 0.55) !important;
       overflow: hidden !important;
       text-overflow: ellipsis !important;
       white-space: nowrap !important;
       opacity: 1 !important;
       visibility: visible !important;
+      line-height: 1.3 !important;
+    `;
+
+    const provider = document.createElement('p');
+    provider.id = 'lyrics-provider';
+    provider.textContent = '';
+    provider.style.cssText = `
+      margin: 4px 0 0 0 !important;
+      font-size: 11px !important;
+      color: rgba(255, 255, 255, 0.4) !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      line-height: 1.2 !important;
+      font-style: italic !important;
     `;
 
     titleContainer.appendChild(title);
     titleContainer.appendChild(artist);
+    titleContainer.appendChild(provider);
 
     header.appendChild(albumCover);
     header.appendChild(titleContainer);
@@ -465,7 +515,12 @@ export class LyricsUI {
 
     // Clear using replaceChildren for Trusted Types compatibility
     this.lyricsContainer.replaceChildren();
-    const styles = UI_CONFIG.APPLE_MUSIC_STYLE;
+    
+    // Add padding spacers to allow first/last lyrics to scroll to center
+    const topSpacer = document.createElement('div');
+    topSpacer.style.height = '120px';
+    topSpacer.style.flexShrink = '0';
+    this.lyricsContainer.appendChild(topSpacer);
 
     syncedLyrics.forEach((lyric, index) => {
       const lyricLine = document.createElement('div');
@@ -537,6 +592,12 @@ export class LyricsUI {
 
       this.lyricsContainer.appendChild(lyricLine);
     });
+    
+    // Bottom spacer for scroll centering
+    const bottomSpacer = document.createElement('div');
+    bottomSpacer.style.height = '120px';
+    bottomSpacer.style.flexShrink = '0';
+    this.lyricsContainer.appendChild(bottomSpacer);
   }
 
   /**
@@ -613,39 +674,44 @@ export class LyricsUI {
 
     const lineIndex = parseInt(lineElement.dataset.index || '-1', 10);
     const lastIdx = this._lastWordIndexMap.get(lineIndex) ?? -1;
-    if (currentWordIndex === lastIdx) return; // nothing changed
+    
+    // Always update all words to ensure proper past/current/future state
+    // This fixes the issue where future words stayed highlighted
+    wordArray.forEach((word, idx) => {
+      if (idx < currentWordIndex) {
+        // Past words
+        word.classList.remove('highlighted', 'future');
+        word.classList.add('past');
+      } else if (idx === currentWordIndex) {
+        // Current word
+        word.classList.add('highlighted');
+        word.classList.remove('past', 'future');
+        
+        // Add subtle pulse animation only when word changes
+        if (lastIdx !== currentWordIndex) {
+          word.style.animation = 'word-pulse 0.4s ease-out';
+          setTimeout(() => {
+            if (word) word.style.animation = '';
+          }, 400);
+        }
+      } else {
+        // Future words
+        word.classList.remove('highlighted', 'past');
+        word.classList.add('future');
+      }
+    });
 
-    // Update previous highlighted word
-    if (lastIdx >= 0 && wordArray[lastIdx]) {
-      const prev = wordArray[lastIdx];
-      prev.classList.remove('highlighted');
-      prev.classList.add('past');
-    }
-
-    // Update current highlighted word
-    if (currentWordIndex >= 0 && wordArray[currentWordIndex]) {
-      const cur = wordArray[currentWordIndex];
-      cur.classList.add('highlighted');
-      cur.classList.remove('past', 'future');
-
-      // Add subtle pulse animation for active word
-      cur.style.animation = 'word-pulse 0.4s ease-out';
-      setTimeout(() => {
-        if (cur) cur.style.animation = '';
-      }, 400);
-    }
-
-    // Lazily mark words before current as past and after as future only when needed
     // Update stored index
     this._lastWordIndexMap.set(lineIndex, currentWordIndex);
   }
 
   /**
-   * Update song title and artist
+   * Update song title, artist, and provider attribution
    */
-  updateTitle(title, artist = '') {
+  updateTitle(title, artist = '', providerName = '') {
     const titleElement = document.getElementById('song-title');
     const artistElement = document.getElementById('song-artist');
+    const providerElement = document.getElementById('lyrics-provider');
 
     if (titleElement) {
       titleElement.textContent = title || 'Lyrics';
@@ -658,6 +724,13 @@ export class LyricsUI {
       artistElement.style.display = artist ? 'block' : 'none';
       artistElement.style.opacity = '1';
       artistElement.style.visibility = 'visible';
+    }
+
+    if (providerElement) {
+      providerElement.textContent = providerName ? `Lyrics by ${providerName}` : '';
+      providerElement.style.display = providerName ? 'block' : 'none';
+      providerElement.style.opacity = '1';
+      providerElement.style.visibility = 'visible';
     }
   }
 

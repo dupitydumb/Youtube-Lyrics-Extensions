@@ -52,13 +52,13 @@ class Musixmatch {
         const expirationKey = "musixmatch_expiration";
         const currentTime = Math.floor(Date.now() / 1000);
 
-        // Check for cached token
+        // Check for cached token first
         const cachedToken = localStorage.getItem(tokenKey);
         const expirationTime = parseInt(localStorage.getItem(expirationKey) || "0");
 
         if (cachedToken && expirationTime && currentTime < expirationTime) {
             this.token = cachedToken;
-            console.log('[Musixmatch] Using cached token');
+            console.log('[Musixmatch] Using cached token (expires in ' + Math.round((expirationTime - currentTime) / 60) + ' min)');
             return;
         }
 
@@ -66,9 +66,9 @@ class Musixmatch {
         console.log('[Musixmatch] Fetching new token...');
         const response = await this._get("token.get", [["user_language", "en"]]);
         const data = await response.json();
-        console.log('[Musixmatch] Token response:', JSON.stringify(data, null, 2));
 
         if (data.message.header.status_code === 401) {
+            console.log('[Musixmatch] Token request got 401 (captcha/rate limit)');
             // Clear cached token on 401
             localStorage.removeItem(tokenKey);
             localStorage.removeItem(expirationKey);
@@ -81,7 +81,7 @@ class Musixmatch {
             }
 
             // Wait 10 seconds like Python version and retry
-            console.log(`[Musixmatch] Got 401, waiting 10s before retry (attempt ${this.tokenRetryCount}/${this.maxTokenRetries})...`);
+            console.log(`[Musixmatch] Waiting 10s before retry (attempt ${this.tokenRetryCount}/${this.maxTokenRetries})...`);
             await new Promise(resolve => setTimeout(resolve, 10000));
             return this._getToken();
         }
@@ -96,11 +96,11 @@ class Musixmatch {
         const newToken = data.message.body.user_token;
         const newExpirationTime = currentTime + 600; // 10 minutes
 
-        // Cache the token
+        // Cache the token - only save AFTER we confirmed it's valid (status 200)
         this.token = newToken;
         localStorage.setItem(tokenKey, newToken);
         localStorage.setItem(expirationKey, String(newExpirationTime));
-        console.log('[Musixmatch] Got new token, expires in 10 minutes');
+        console.log('[Musixmatch] Got new valid token, cached for 10 minutes');
     }
 
     // Clear token to force refresh
@@ -111,7 +111,7 @@ class Musixmatch {
         console.log('[Musixmatch] Token cleared');
     }
 
-    async getLrcById(trackId) {
+    async getLrcById(trackId, retryOnAuth = true) {
         const response = await this._get("track.subtitle.get", [
             ["track_id", trackId],
             ["subtitle_format", "lrc"]
@@ -141,12 +141,16 @@ class Musixmatch {
         }
 
         const data = await response.json();
-        console.log('[Musixmatch] getLrcById response:', JSON.stringify(data, null, 2));
 
-        // Handle 401 by clearing token for next request
+        // Handle 401 by clearing token and retrying once
         if (data.message.header.status_code === 401) {
-            console.log('[Musixmatch] Got 401 on getLrcById, clearing token');
+            console.log('[Musixmatch] Got 401 on getLrcById, clearing cached token');
             this.clearToken();
+            
+            if (retryOnAuth) {
+                console.log('[Musixmatch] Retrying getLrcById with fresh token...');
+                return this.getLrcById(trackId, false);
+            }
             return null;
         }
 
@@ -179,7 +183,7 @@ class Musixmatch {
         return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
     }
 
-    async getLrcWordByWord(trackId) {
+    async getLrcWordByWord(trackId, retryOnAuth = true) {
         try {
             const response = await this._get("track.richsync.get", [["track_id", trackId]]);
 
@@ -187,10 +191,15 @@ class Musixmatch {
                 const data = await response.json();
                 console.log('[Musixmatch] getLrcWordByWord response status:', data.message.header.status_code);
 
-                // Handle 401
+                // Handle 401 with retry
                 if (data.message.header.status_code === 401) {
-                    console.log('[Musixmatch] Got 401 on richsync, clearing token');
+                    console.log('[Musixmatch] Got 401 on richsync, clearing cached token');
                     this.clearToken();
+                    
+                    if (retryOnAuth) {
+                        console.log('[Musixmatch] Retrying richsync with fresh token...');
+                        return this.getLrcWordByWord(trackId, false);
+                    }
                     return { synced: null };
                 }
 
@@ -256,7 +265,7 @@ class Musixmatch {
         return bestMatch;
     }
 
-    async getLrc(searchTerm) {
+    async getLrc(searchTerm, retryOnAuth = true) {
         console.log(`[Musixmatch] Searching for: "${searchTerm}"`);
 
         const response = await this._get("track.search", [
@@ -270,10 +279,15 @@ class Musixmatch {
 
         const statusCode = data.message.header.status_code;
 
-        // Handle 401 by clearing token
+        // Handle 401 by clearing token and retrying once with fresh token
         if (statusCode === 401) {
-            console.log('[Musixmatch] Got 401 on search, clearing token');
+            console.log('[Musixmatch] Got 401 on search, clearing cached token');
             this.clearToken();
+            
+            if (retryOnAuth) {
+                console.log('[Musixmatch] Retrying search with fresh token...');
+                return this.getLrc(searchTerm, false); // Retry once with fresh token
+            }
             return null;
         }
 

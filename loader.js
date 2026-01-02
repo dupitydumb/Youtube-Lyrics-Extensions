@@ -12,19 +12,21 @@
     // Only accept messages from the same window
     if (event.source !== window) return;
 
-    // Handle fetch requests from page scripts
-    if (event.data && event.data.type === 'MUSIXMATCH_FETCH_REQUEST') {
+    // Handle fetch requests from page scripts (supports both MUSIXMATCH_FETCH_REQUEST and PROVIDER_FETCH_REQUEST)
+    if (event.data && (event.data.type === 'MUSIXMATCH_FETCH_REQUEST' || event.data.type === 'PROVIDER_FETCH_REQUEST')) {
       const requestId = event.data.requestId;
       const url = event.data.url;
+      const options = event.data.options || {};
+      const responseType = event.data.type === 'MUSIXMATCH_FETCH_REQUEST' ? 'MUSIXMATCH_FETCH_RESPONSE' : 'PROVIDER_FETCH_RESPONSE';
 
       try {
         // Forward to background script via chrome.runtime
         chrome.runtime.sendMessage(
-          { type: 'FETCH_REQUEST', url: url },
+          { type: 'FETCH_REQUEST', url: url, options: options },
           (response) => {
             // Send response back to page script
             window.postMessage({
-              type: 'MUSIXMATCH_FETCH_RESPONSE',
+              type: responseType,
               requestId: requestId,
               response: response,
               error: chrome.runtime.lastError ? chrome.runtime.lastError.message : null
@@ -33,7 +35,7 @@
         );
       } catch (error) {
         window.postMessage({
-          type: 'MUSIXMATCH_FETCH_RESPONSE',
+          type: responseType,
           requestId: requestId,
           response: null,
           error: error.message
