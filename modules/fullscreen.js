@@ -121,16 +121,6 @@ export class FullscreenManager {
         min-height: 40vh;
       }
       
-      /* Slide up animation - same for all, gap from timing */
-      @keyframes line-slide-up {
-        0% {
-          transform: translateY(0);
-        }
-        100% {
-          transform: translateY(-24px);
-        }
-      }
-      
       /* Apple Music Fullscreen Typography */
       #fullscreen-lyrics-container .lyric-line,
       #fullscreen-lyrics-container .VocalsGroup {
@@ -143,44 +133,41 @@ export class FullscreenManager {
         padding: 0.6rem 0 !important;
         text-align: left !important;
         font-style: normal !important;
-        transition: color 0.4s ease !important;
+        transform: translateY(0) !important;
+        transition: 
+          color 0.4s ease,
+          transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) !important;
       }
       
-      /* Current line - waits, natural gap from delay */
+      /* Current line - moves up with delay */
       #fullscreen-lyrics-container .lyric-line.lyric-current,
       #fullscreen-lyrics-container .VocalsGroup.lyric-current {
         color: #fff8e6 !important;
         text-align: left !important;
         font-style: normal !important;
-        animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards !important;
-        animation-delay: 0.2s !important;
+        transform: translateY(-24px) !important;
+        transition-delay: 0.15s !important;
       }
       
-      /* Past lines - move first */
+      /* Past lines - already moved up */
       #fullscreen-lyrics-container .lyric-line.lyric-past,
       #fullscreen-lyrics-container .VocalsGroup.lyric-past {
         color: rgba(255, 248, 230, 0.85) !important;
         text-align: left !important;
         font-style: normal !important;
-        animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards !important;
-        animation-delay: 0s !important;
+        transform: translateY(-24px) !important;
+        transition-delay: 0s !important;
       }
       
-      /* Future lines - cascade timing */
+      /* Future lines - waiting at base */
       #fullscreen-lyrics-container .lyric-line.lyric-future,
       #fullscreen-lyrics-container .VocalsGroup.lyric-future {
         color: rgba(255, 248, 230, 0.35) !important;
         text-align: left !important;
         font-style: normal !important;
-        animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards !important;
+        transform: translateY(0) !important;
+        transition-delay: 0s !important;
       }
-      
-      /* Staggered delays - visible cascade */
-      #fullscreen-lyrics-container .lyric-line.lyric-future:nth-of-type(1) { animation-delay: 0.35s !important; }
-      #fullscreen-lyrics-container .lyric-line.lyric-future:nth-of-type(2) { animation-delay: 0.5s !important; }
-      #fullscreen-lyrics-container .lyric-line.lyric-future:nth-of-type(3) { animation-delay: 0.65s !important; }
-      #fullscreen-lyrics-container .lyric-line.lyric-future:nth-of-type(4) { animation-delay: 0.8s !important; }
-      #fullscreen-lyrics-container .lyric-line.lyric-future:nth-of-type(5) { animation-delay: 0.95s !important; }
       
       /* Word highlighting for fullscreen - inherit size from parent */
       #fullscreen-lyrics-container .lyric-word {

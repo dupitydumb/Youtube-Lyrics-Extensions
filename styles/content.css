@@ -355,57 +355,45 @@
   word-wrap: break-word;
   border-radius: 8px;
   font-style: normal;
-  /* Only color transition - transform handled by animation */
-  transition: color 0.4s ease;
-}
-
-/* Slide up animation - same for all lines, gap from timing */
-@keyframes line-slide-up {
-  0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(-24px);
-  }
+  /* Base state - no transform */
+  transform: translateY(0);
+  /* Smooth transitions - cascading via custom property */
+  transition: 
+    color 0.4s ease,
+    transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* ==================== APPLE MUSIC LINE STATES ==================== */
 
-/* PAST LINES - Moves first, creates gap ahead */
+/* PAST LINES - Already scrolled up */
 .lyric-line.lyric-past {
   color: rgba(255, 248, 230, 0.85);
   text-align: left;
   font-weight: 700;
   font-style: normal;
-  animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-  animation-delay: 0s;
+  transform: translateY(-24px);
+  transition-delay: 0s;
 }
 
-/* CURRENT LINE - Moves after past, natural gap forms */
+/* CURRENT LINE - Highlighted, moves up with delay */
 .lyric-line.lyric-current {
   color: #fff8e6;
   text-align: left;
   font-style: normal;
   font-weight: 700;
-  animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-  animation-delay: 0.2s;
+  transform: translateY(-24px);
+  transition-delay: 0.15s;
 }
 
-/* FUTURE LINES - Cascading delays, each waits for previous */
+/* FUTURE LINES - Waiting to scroll */
 .lyric-line.lyric-future {
   color: rgba(255, 248, 230, 0.35);
   text-align: left;
   font-style: normal;
   font-weight: 700;
-  animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  transform: translateY(0);
+  transition-delay: 0s;
 }
-
-/* Staggered delays create visible wave effect */
-.lyric-line.lyric-future:nth-of-type(1) { animation-delay: 0.35s; }
-.lyric-line.lyric-future:nth-of-type(2) { animation-delay: 0.5s; }
-.lyric-line.lyric-future:nth-of-type(3) { animation-delay: 0.65s; }
-.lyric-line.lyric-future:nth-of-type(4) { animation-delay: 0.8s; }
-.lyric-line.lyric-future:nth-of-type(5) { animation-delay: 0.95s; }
 
 /* Legacy classes for backwards compatibility */
 .lyric-line.lyric-prev {

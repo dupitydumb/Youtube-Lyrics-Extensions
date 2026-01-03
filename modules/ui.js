@@ -352,56 +352,43 @@ export class LyricsUI {
         cursor: pointer !important;
       }
       
-      /* Slide up animation - same for all, gap from timing */
-      @keyframes line-slide-up {
-        0% {
-          transform: translateY(0);
-        }
-        100% {
-          transform: translateY(-24px);
-        }
-      }
-      
-      /* Base - only color transitions */
+      /* Base - transitions for smooth movement */
       #lyrics-display .lyric-line {
-        transition: color 0.4s ease !important;
+        transform: translateY(0) !important;
+        transition: 
+          color 0.4s ease,
+          transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) !important;
       }
       
-      /* Past lines - move first, gap forms ahead */
+      /* Past lines - already moved up */
       #lyrics-display .lyric-line.lyric-past {
         color: rgba(255, 248, 230, 0.85) !important;
         text-align: left !important;
         font-style: normal !important;
         font-weight: 700 !important;
-        animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards !important;
-        animation-delay: 0s !important;
+        transform: translateY(-24px) !important;
+        transition-delay: 0s !important;
       }
       
-      /* Current line - waits, natural gap from delay */
+      /* Current line - moves up with slight delay */
       #lyrics-display .lyric-line.lyric-current {
         color: #fff8e6 !important;
         text-align: left !important;
         font-style: normal !important;
         font-weight: 700 !important;
-        animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards !important;
-        animation-delay: 0.2s !important;
+        transform: translateY(-24px) !important;
+        transition-delay: 0.15s !important;
       }
       
-      /* Future lines - cascade timing creates wave */
+      /* Future lines - waiting at base position */
       #lyrics-display .lyric-line.lyric-future {
         color: rgba(255, 248, 230, 0.35) !important;
         text-align: left !important;
         font-style: normal !important;
         font-weight: 700 !important;
-        animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards !important;
+        transform: translateY(0) !important;
+        transition-delay: 0s !important;
       }
-      
-      /* Staggered delays - visible cascade effect */
-      #lyrics-display .lyric-line.lyric-future:nth-of-type(1) { animation-delay: 0.35s !important; }
-      #lyrics-display .lyric-line.lyric-future:nth-of-type(2) { animation-delay: 0.5s !important; }
-      #lyrics-display .lyric-line.lyric-future:nth-of-type(3) { animation-delay: 0.65s !important; }
-      #lyrics-display .lyric-line.lyric-future:nth-of-type(4) { animation-delay: 0.8s !important; }
-      #lyrics-display .lyric-line.lyric-future:nth-of-type(5) { animation-delay: 0.95s !important; }
       
       /* Hover effect */
       #lyrics-display .lyric-line:hover {
