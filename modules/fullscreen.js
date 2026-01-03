@@ -121,7 +121,23 @@ export class FullscreenManager {
         min-height: 40vh;
       }
       
-      /* Apple Music Fullscreen Typography - consistent font-weight to prevent jitter */
+      /* Current line enter animation - only this line animates */
+      @keyframes current-line-enter {
+        0% {
+          transform: translateY(8px);
+          opacity: 0.7;
+          padding-top: 0.6rem;
+          padding-bottom: 0.6rem;
+        }
+        100% {
+          transform: translateY(0);
+          opacity: 1;
+          padding-top: 1.5rem;
+          padding-bottom: 1.5rem;
+        }
+      }
+      
+      /* Apple Music Fullscreen Typography */
       #fullscreen-lyrics-container .lyric-line,
       #fullscreen-lyrics-container .VocalsGroup {
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
@@ -133,26 +149,42 @@ export class FullscreenManager {
         padding: 0.6rem 0 !important;
         text-align: left !important;
         font-style: normal !important;
-        transition: color 0.4s ease, text-align 0.3s ease, font-style 0.3s ease !important;
+        transition: 
+          color 0.3s ease,
+          padding-top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+          padding-bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
       }
       
+      /* Current line - ONLY this animates */
       #fullscreen-lyrics-container .lyric-line.lyric-current,
       #fullscreen-lyrics-container .VocalsGroup.lyric-current {
         color: #fff8e6 !important;
+        text-align: left !important;
+        font-style: normal !important;
+        padding-top: 1.5rem !important;
+        padding-bottom: 1.5rem !important;
+        animation: current-line-enter 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
       }
       
+      /* Past lines - gap closes via transition */
       #fullscreen-lyrics-container .lyric-line.lyric-past,
       #fullscreen-lyrics-container .VocalsGroup.lyric-past {
         color: rgba(255, 248, 230, 0.85) !important;
         text-align: left !important;
         font-style: normal !important;
+        padding-top: 0.6rem !important;
+        padding-bottom: 0.6rem !important;
+        transform: translateY(0) !important;
       }
       
+      /* Future lines - static */
       #fullscreen-lyrics-container .lyric-line.lyric-future,
       #fullscreen-lyrics-container .VocalsGroup.lyric-future {
         color: rgba(255, 248, 230, 0.35) !important;
         text-align: left !important;
         font-style: normal !important;
+        padding-top: 0.6rem !important;
+        padding-bottom: 0.6rem !important;
       }
       
       /* Word highlighting for fullscreen - inherit size from parent */

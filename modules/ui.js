@@ -352,26 +352,60 @@ export class LyricsUI {
         cursor: pointer !important;
       }
       
-      /* Past lines - bright cream, left-aligned */
+      /* Current line enter animation - only this line animates */
+      @keyframes current-line-enter {
+        0% {
+          transform: translateY(8px);
+          opacity: 0.7;
+          padding-top: 0.5rem;
+          padding-bottom: 0.5rem;
+        }
+        100% {
+          transform: translateY(0);
+          opacity: 1;
+          padding-top: 1.2rem;
+          padding-bottom: 1.2rem;
+        }
+      }
+      
+      /* Base transitions for gap closing */
+      #lyrics-display .lyric-line {
+        transition: 
+          color 0.3s ease,
+          padding-top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+          padding-bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+      
+      /* Past lines - gap closes via transition, no animation */
       #lyrics-display .lyric-line.lyric-past {
         color: rgba(255, 248, 230, 0.85) !important;
         text-align: left !important;
         font-style: normal !important;
         font-weight: 700 !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+        transform: translateY(0) !important;
       }
       
-      /* Current line - bold cream, centered, italic, larger */
+      /* Current line - ONLY this line gets animation */
       #lyrics-display .lyric-line.lyric-current {
         color: #fff8e6 !important;
+        text-align: left !important;
+        font-style: normal !important;
         font-weight: 700 !important;
+        padding-top: 1.2rem !important;
+        padding-bottom: 1.2rem !important;
+        animation: current-line-enter 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
       }
       
-      /* Future lines - dimmer, left-aligned */
+      /* Future lines - static, no animation */
       #lyrics-display .lyric-line.lyric-future {
         color: rgba(255, 248, 230, 0.35) !important;
         text-align: left !important;
         font-style: normal !important;
         font-weight: 700 !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
       }
       
       /* Hover effect */

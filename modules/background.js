@@ -32,7 +32,7 @@ export class BackgroundManager {
     bgLayer.style.overflow = 'hidden';
     bgLayer.style.transition = 'opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
     bgLayer.style.pointerEvents = 'none';
-    bgLayer.style.filter = 'blur(5px)';
+    bgLayer.style.filter = 'blur(85px)';
     
     this.element = bgLayer;
     return bgLayer;

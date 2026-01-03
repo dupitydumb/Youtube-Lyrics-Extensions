@@ -341,7 +341,8 @@
 /* ==================== LYRICS LINE - BASE ==================== */
 .lyric-line {
   position: relative;
-  padding: 0.6rem 1rem;
+  padding: 0.5rem 1rem;
+  margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 1.75rem;
   font-weight: 700;
@@ -354,40 +355,61 @@
   word-wrap: break-word;
   border-radius: 8px;
   font-style: normal;
-  /* Smooth transitions for all state changes */
-  transition:
-    color 0.4s ease,
-    transform 0.4s ease,
-    opacity 0.4s ease,
-    text-align 0.3s ease,
-    font-style 0.3s ease,
-    font-size 0.3s ease;
+  /* Smooth transitions for gap closing */
+  transition: 
+    color 0.3s ease,
+    padding-top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    padding-bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Slide up animation - only for current line */
+@keyframes current-line-enter {
+  0% {
+    transform: translateY(8px);
+    opacity: 0.7;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+    padding-top: 1.2rem;
+    padding-bottom: 1.2rem;
+  }
 }
 
 /* ==================== APPLE MUSIC LINE STATES ==================== */
 
-/* PAST LINES - Bright cream, left-aligned, already played */
+/* PAST LINES - Gap closes via transition, no animation */
 .lyric-line.lyric-past {
   color: rgba(255, 248, 230, 0.85);
   text-align: left;
   font-weight: 700;
+  font-style: normal;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  transform: translateY(0);
 }
 
-/* CURRENT LINE - Bold cream, centered, italic, larger and prominent */
+/* CURRENT LINE - Only this line animates */
 .lyric-line.lyric-current {
   color: #fff8e6;
-  text-align: center;
-  font-style: italic;
-  font-size: 2rem;
+  text-align: left;
+  font-style: normal;
   font-weight: 700;
+  padding-top: 1.2rem;
+  padding-bottom: 1.2rem;
+  animation: current-line-enter 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* FUTURE LINES - Dimmer, left-aligned, waiting to be sung */
+/* FUTURE LINES - Static, no animation */
 .lyric-line.lyric-future {
   color: rgba(255, 248, 230, 0.35);
   text-align: left;
   font-style: normal;
   font-weight: 700;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 /* Legacy classes for backwards compatibility */
@@ -396,6 +418,8 @@
   text-align: left;
   font-style: normal;
   font-weight: 700;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 .lyric-line.lyric-next {
@@ -403,6 +427,8 @@
   text-align: left;
   font-style: normal;
   font-weight: 700;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 /* ==================== HOVER STATES ==================== */
@@ -645,6 +671,29 @@
 
   100% {
     transform: scale(1) translateY(0);
+  }
+}
+
+/* Bump-up animation for current lyric - smooth spring effect */
+@keyframes lyric-bump-up {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  
+  30% {
+    transform: translateY(-8px) scale(1.02);
+  }
+  
+  50% {
+    transform: translateY(-12px) scale(1.03);
+  }
+  
+  70% {
+    transform: translateY(-6px) scale(1.01);
+  }
+  
+  100% {
+    transform: translateY(-4px) scale(1);
   }
 }
 
@@ -1105,6 +1154,8 @@
   text-align: left;
   font-style: italic;
   font-weight: 700;
+  font-size: 3rem;
+  animation: lyric-bump-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 #fullscreen-lyrics-container .lyric-line.lyric-past,
@@ -1230,8 +1281,7 @@
   color: #fff8e6;
   font-size: 40px;
   font-weight: 700;
-  text-align: center;
-  font-style: italic;
+  animation: lyric-bump-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 .fullscreen-lyric-line.past {
@@ -1439,6 +1489,7 @@
   font-style: italic;
   font-size: 2rem;
   font-weight: 700;
+  animation: lyric-bump-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 .VocalsGroup.lyric-future {
