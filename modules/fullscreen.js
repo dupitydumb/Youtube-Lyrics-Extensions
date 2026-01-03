@@ -121,20 +121,22 @@ export class FullscreenManager {
         min-height: 40vh;
       }
       
-      /* Current line enter animation - only this line animates */
+      /* Current line enter animation */
       @keyframes current-line-enter {
         0% {
-          transform: translateY(8px);
-          opacity: 0.7;
-          padding-top: 0.6rem;
-          padding-bottom: 0.6rem;
+          transform: translateY(12px);
+          opacity: 0.6;
         }
         100% {
           transform: translateY(0);
           opacity: 1;
-          padding-top: 1.5rem;
-          padding-bottom: 1.5rem;
         }
+      }
+      
+      /* Past line slide animation */
+      @keyframes past-line-slide {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(-4px); }
       }
       
       /* Apple Music Fullscreen Typography */
@@ -146,36 +148,44 @@ export class FullscreenManager {
         line-height: 1.3 !important;
         letter-spacing: -0.02em !important;
         color: rgba(255, 248, 230, 0.35) !important;
-        padding: 0.6rem 0 !important;
+        padding: 0.5rem 0 !important;
         text-align: left !important;
         font-style: normal !important;
         transition: 
-          color 0.3s ease,
-          padding-top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-          padding-bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          color 0.35s ease,
+          padding-top 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+          padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+          transform 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
       }
       
-      /* Current line - ONLY this animates */
+      /* Current line - large gap */
       #fullscreen-lyrics-container .lyric-line.lyric-current,
       #fullscreen-lyrics-container .VocalsGroup.lyric-current {
         color: #fff8e6 !important;
         text-align: left !important;
         font-style: normal !important;
-        padding-top: 1.5rem !important;
-        padding-bottom: 1.5rem !important;
-        animation: current-line-enter 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+        padding-top: 2.5rem !important;
+        padding-bottom: 2.5rem !important;
+        animation: current-line-enter 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
       }
       
-      /* Past lines - gap closes via transition */
+      /* Past lines - cascade animation */
       #fullscreen-lyrics-container .lyric-line.lyric-past,
       #fullscreen-lyrics-container .VocalsGroup.lyric-past {
         color: rgba(255, 248, 230, 0.85) !important;
         text-align: left !important;
         font-style: normal !important;
-        padding-top: 0.6rem !important;
-        padding-bottom: 0.6rem !important;
-        transform: translateY(0) !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+        animation: past-line-slide 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
       }
+      
+      /* Cascading delays for past lines in fullscreen */
+      #fullscreen-lyrics-container .lyric-line.lyric-past:nth-last-of-type(1) { animation-delay: 0s; }
+      #fullscreen-lyrics-container .lyric-line.lyric-past:nth-last-of-type(2) { animation-delay: 0.08s; }
+      #fullscreen-lyrics-container .lyric-line.lyric-past:nth-last-of-type(3) { animation-delay: 0.16s; }
+      #fullscreen-lyrics-container .lyric-line.lyric-past:nth-last-of-type(4) { animation-delay: 0.24s; }
+      #fullscreen-lyrics-container .lyric-line.lyric-past:nth-last-of-type(5) { animation-delay: 0.32s; }
       
       /* Future lines - static */
       #fullscreen-lyrics-container .lyric-line.lyric-future,
@@ -183,9 +193,16 @@ export class FullscreenManager {
         color: rgba(255, 248, 230, 0.35) !important;
         text-align: left !important;
         font-style: normal !important;
-        padding-top: 0.6rem !important;
-        padding-bottom: 0.6rem !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
       }
+      
+      /* Cascading delays for future lines */
+      #fullscreen-lyrics-container .lyric-line.lyric-future:nth-of-type(1) { transition-delay: 0.1s; }
+      #fullscreen-lyrics-container .lyric-line.lyric-future:nth-of-type(2) { transition-delay: 0.18s; }
+      #fullscreen-lyrics-container .lyric-line.lyric-future:nth-of-type(3) { transition-delay: 0.26s; }
+      #fullscreen-lyrics-container .lyric-line.lyric-future:nth-of-type(4) { transition-delay: 0.34s; }
+      #fullscreen-lyrics-container .lyric-line.lyric-future:nth-of-type(5) { transition-delay: 0.42s; }
       
       /* Word highlighting for fullscreen - inherit size from parent */
       #fullscreen-lyrics-container .lyric-word {

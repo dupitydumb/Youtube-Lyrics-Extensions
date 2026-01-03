@@ -352,61 +352,78 @@ export class LyricsUI {
         cursor: pointer !important;
       }
       
-      /* Current line enter animation - only this line animates */
+      /* Current line enter animation */
       @keyframes current-line-enter {
         0% {
-          transform: translateY(8px);
-          opacity: 0.7;
-          padding-top: 0.5rem;
-          padding-bottom: 0.5rem;
+          transform: translateY(12px);
+          opacity: 0.6;
         }
         100% {
           transform: translateY(0);
           opacity: 1;
-          padding-top: 1.2rem;
-          padding-bottom: 1.2rem;
         }
       }
       
-      /* Base transitions for gap closing */
-      #lyrics-display .lyric-line {
-        transition: 
-          color 0.3s ease,
-          padding-top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-          padding-bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      /* Past line slide animation */
+      @keyframes past-line-slide {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(-4px); }
       }
       
-      /* Past lines - gap closes via transition, no animation */
+      /* Base transitions */
+      #lyrics-display .lyric-line {
+        transition: 
+          color 0.35s ease,
+          padding-top 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+          padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+          transform 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+      
+      /* Past lines - cascade animation */
       #lyrics-display .lyric-line.lyric-past {
         color: rgba(255, 248, 230, 0.85) !important;
         text-align: left !important;
         font-style: normal !important;
         font-weight: 700 !important;
-        padding-top: 0.5rem !important;
-        padding-bottom: 0.5rem !important;
-        transform: translateY(0) !important;
+        padding-top: 0.4rem !important;
+        padding-bottom: 0.4rem !important;
+        animation: past-line-slide 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
       }
       
-      /* Current line - ONLY this line gets animation */
+      /* Cascading delays for past lines */
+      #lyrics-display .lyric-line.lyric-past:nth-last-of-type(1) { animation-delay: 0s; }
+      #lyrics-display .lyric-line.lyric-past:nth-last-of-type(2) { animation-delay: 0.08s; }
+      #lyrics-display .lyric-line.lyric-past:nth-last-of-type(3) { animation-delay: 0.16s; }
+      #lyrics-display .lyric-line.lyric-past:nth-last-of-type(4) { animation-delay: 0.24s; }
+      #lyrics-display .lyric-line.lyric-past:nth-last-of-type(5) { animation-delay: 0.32s; }
+      
+      /* Current line - large gap, slides up */
       #lyrics-display .lyric-line.lyric-current {
         color: #fff8e6 !important;
         text-align: left !important;
         font-style: normal !important;
         font-weight: 700 !important;
-        padding-top: 1.2rem !important;
-        padding-bottom: 1.2rem !important;
-        animation: current-line-enter 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
+        animation: current-line-enter 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
       }
       
-      /* Future lines - static, no animation */
+      /* Future lines - static with cascade delays */
       #lyrics-display .lyric-line.lyric-future {
         color: rgba(255, 248, 230, 0.35) !important;
         text-align: left !important;
         font-style: normal !important;
         font-weight: 700 !important;
-        padding-top: 0.5rem !important;
-        padding-bottom: 0.5rem !important;
+        padding-top: 0.4rem !important;
+        padding-bottom: 0.4rem !important;
       }
+      
+      /* Cascading delays for future lines */
+      #lyrics-display .lyric-line.lyric-future:nth-of-type(1) { transition-delay: 0.1s; }
+      #lyrics-display .lyric-line.lyric-future:nth-of-type(2) { transition-delay: 0.18s; }
+      #lyrics-display .lyric-line.lyric-future:nth-of-type(3) { transition-delay: 0.26s; }
+      #lyrics-display .lyric-line.lyric-future:nth-of-type(4) { transition-delay: 0.34s; }
+      #lyrics-display .lyric-line.lyric-future:nth-of-type(5) { transition-delay: 0.42s; }
       
       /* Hover effect */
       #lyrics-display .lyric-line:hover {
