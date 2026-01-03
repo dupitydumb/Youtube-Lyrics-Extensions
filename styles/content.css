@@ -357,42 +357,51 @@
   font-style: normal;
   /* Base state - no transform */
   transform: translateY(0);
-  /* Smooth transitions - cascading via custom property */
+  /* Airport display-style conveyor animation - smooth mechanical movement */
   transition: 
-    color 0.4s ease,
-    transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+    color 0.35s ease-out,
+    transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* CSS variable for staggered delay (set via JS) */
+  transition-delay: var(--stagger-delay, 0s);
 }
 
 /* ==================== APPLE MUSIC LINE STATES ==================== */
+/* Airport waiting line style - lines slide up together like a conveyor belt */
 
-/* PAST LINES - Already scrolled up */
+/* PAST LINES - Already scrolled up, settled in position */
 .lyric-line.lyric-past {
   color: rgba(255, 248, 230, 0.85);
   text-align: left;
   font-weight: 700;
   font-style: normal;
-  transform: translateY(-24px);
-  transition-delay: 0s;
+  transform: translateY(-28px);
+  /* Staggered delay for cascading conveyor effect */
+  transition-delay: var(--stagger-delay, 0s);
+  transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-/* CURRENT LINE - Highlighted, moves up with delay */
+/* CURRENT LINE - The "now serving" line, moves up to take its position */
 .lyric-line.lyric-current {
   color: #fff8e6;
   text-align: left;
   font-style: normal;
   font-weight: 700;
-  transform: translateY(-24px);
-  transition-delay: 0.15s;
+  transform: translateY(-28px);
+  /* Lead delay - current line initiates the cascade */
+  transition-delay: calc(var(--stagger-delay, 0s) + 0.08s);
+  transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-/* FUTURE LINES - Waiting to scroll */
+/* FUTURE LINES - Waiting in queue, ready to advance */
 .lyric-line.lyric-future {
   color: rgba(255, 248, 230, 0.35);
   text-align: left;
   font-style: normal;
   font-weight: 700;
   transform: translateY(0);
-  transition-delay: 0s;
+  /* Cascading delay - future lines follow with slight stagger */
+  transition-delay: calc(var(--stagger-delay, 0s) + 0.12s);
+  transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 /* Legacy classes for backwards compatibility */

@@ -128,6 +128,7 @@ export class LyricsUI {
   /**
    * Perform the actual DOM updates — Apple Music scrollable display
    * Shows all lyrics with current line highlighted and scrolled into view
+   * Uses airport waiting line style animation - lines cascade up like a conveyor belt
    */
   performUpdate(currentIndex, currentTime = null, indexChanged = true) {
     if (!this.lyricsContainer) return;
@@ -143,6 +144,10 @@ export class LyricsUI {
     // Define position class constants
     const CLASSES = ['lyric-past', 'lyric-current', 'lyric-future', 'lyric-prev', 'lyric-next', 'lyric-exit', 'lyric-enter', 'current', 'past', 'future'];
 
+    // Airport conveyor belt stagger configuration
+    const STAGGER_DELAY = 0.025; // 25ms between each line for smooth cascade
+    const MAX_STAGGER_LINES = 8; // Limit stagger effect to nearby lines
+
     // Update all lines with past/current/future states
     for (let i = 0; i < total; i++) {
       const line = lyricLines[i];
@@ -150,6 +155,11 @@ export class LyricsUI {
 
       // Remove all position classes first
       line.classList.remove(...CLASSES);
+
+      // Calculate stagger delay based on distance from current line (airport conveyor effect)
+      const distanceFromCurrent = Math.abs(i - currentIndex);
+      const staggerDelay = Math.min(distanceFromCurrent, MAX_STAGGER_LINES) * STAGGER_DELAY;
+      line.style.setProperty('--stagger-delay', `${staggerDelay}s`);
 
       // Apply appropriate state class
       if (i < currentIndex) {
