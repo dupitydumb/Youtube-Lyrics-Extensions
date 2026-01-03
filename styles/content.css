@@ -341,7 +341,7 @@
 /* ==================== LYRICS LINE - BASE ==================== */
 .lyric-line {
   position: relative;
-  padding: 0.4rem 1rem;
+  padding: 0.6rem 1rem;
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 1.75rem;
@@ -355,83 +355,57 @@
   word-wrap: break-word;
   border-radius: 8px;
   font-style: normal;
-  /* Smooth transitions for gap closing */
-  transition: 
-    color 0.35s ease,
-    padding-top 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-    padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Only color transition - transform handled by animation */
+  transition: color 0.4s ease;
 }
 
-/* Current line enter animation */
-@keyframes current-line-enter {
-  0% {
-    transform: translateY(12px);
-    opacity: 0.6;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-/* Past line slide up animation */
-@keyframes past-line-slide {
+/* Slide up animation - same for all lines, gap from timing */
+@keyframes line-slide-up {
   0% {
     transform: translateY(0);
   }
   100% {
-    transform: translateY(-4px);
+    transform: translateY(-24px);
   }
 }
 
 /* ==================== APPLE MUSIC LINE STATES ==================== */
 
-/* PAST LINES - Gap closes, slight upward shift with cascade delay */
+/* PAST LINES - Moves first, creates gap ahead */
 .lyric-line.lyric-past {
   color: rgba(255, 248, 230, 0.85);
   text-align: left;
   font-weight: 700;
   font-style: normal;
-  padding-top: 0.4rem;
-  padding-bottom: 0.4rem;
-  animation: past-line-slide 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  animation-delay: 0s;
 }
 
-/* Cascading delays for past lines - each waits for previous */
-.lyric-line.lyric-past:nth-last-of-type(1) { animation-delay: 0s; }
-.lyric-line.lyric-past:nth-last-of-type(2) { animation-delay: 0.08s; }
-.lyric-line.lyric-past:nth-last-of-type(3) { animation-delay: 0.16s; }
-.lyric-line.lyric-past:nth-last-of-type(4) { animation-delay: 0.24s; }
-.lyric-line.lyric-past:nth-last-of-type(5) { animation-delay: 0.32s; }
-
-/* CURRENT LINE - Large gap, slides up */
+/* CURRENT LINE - Moves after past, natural gap forms */
 .lyric-line.lyric-current {
   color: #fff8e6;
   text-align: left;
   font-style: normal;
   font-weight: 700;
-  padding-top: 2rem;
-  padding-bottom: 2rem;
-  animation: current-line-enter 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  animation-delay: 0.2s;
 }
 
-/* FUTURE LINES - Static with cascading transition delays */
+/* FUTURE LINES - Cascading delays, each waits for previous */
 .lyric-line.lyric-future {
   color: rgba(255, 248, 230, 0.35);
   text-align: left;
   font-style: normal;
   font-weight: 700;
-  padding-top: 0.4rem;
-  padding-bottom: 0.4rem;
+  animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
 }
 
-/* Cascading delays for future lines */
-.lyric-line.lyric-future:nth-of-type(1) { transition-delay: 0.1s; }
-.lyric-line.lyric-future:nth-of-type(2) { transition-delay: 0.18s; }
-.lyric-line.lyric-future:nth-of-type(3) { transition-delay: 0.26s; }
-.lyric-line.lyric-future:nth-of-type(4) { transition-delay: 0.34s; }
-.lyric-line.lyric-future:nth-of-type(5) { transition-delay: 0.42s; }
+/* Staggered delays create visible wave effect */
+.lyric-line.lyric-future:nth-of-type(1) { animation-delay: 0.35s; }
+.lyric-line.lyric-future:nth-of-type(2) { animation-delay: 0.5s; }
+.lyric-line.lyric-future:nth-of-type(3) { animation-delay: 0.65s; }
+.lyric-line.lyric-future:nth-of-type(4) { animation-delay: 0.8s; }
+.lyric-line.lyric-future:nth-of-type(5) { animation-delay: 0.95s; }
 
 /* Legacy classes for backwards compatibility */
 .lyric-line.lyric-prev {
@@ -439,8 +413,6 @@
   text-align: left;
   font-style: normal;
   font-weight: 700;
-  padding-top: 0.4rem;
-  padding-bottom: 0.4rem;
 }
 
 .lyric-line.lyric-next {
@@ -448,8 +420,6 @@
   text-align: left;
   font-style: normal;
   font-weight: 700;
-  padding-top: 0.4rem;
-  padding-bottom: 0.4rem;
 }
 
 /* ==================== HOVER STATES ==================== */

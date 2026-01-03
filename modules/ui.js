@@ -340,9 +340,9 @@ export class LyricsUI {
         position: relative !important;
         padding: 0.6rem 1rem !important;
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-        font-size: 1.75rem !important;
+        font-size: 1.7rem !important;
         font-weight: 700 !important;
-        line-height: 1.3 !important;
+        line-height: 2.5 !important;
         letter-spacing: -0.02em !important;
         color: rgba(255, 248, 230, 0.35) !important;
         text-align: left !important;
@@ -352,78 +352,56 @@ export class LyricsUI {
         cursor: pointer !important;
       }
       
-      /* Current line enter animation */
-      @keyframes current-line-enter {
+      /* Slide up animation - same for all, gap from timing */
+      @keyframes line-slide-up {
         0% {
-          transform: translateY(12px);
-          opacity: 0.6;
+          transform: translateY(0);
         }
         100% {
-          transform: translateY(0);
-          opacity: 1;
+          transform: translateY(-24px);
         }
       }
       
-      /* Past line slide animation */
-      @keyframes past-line-slide {
-        0% { transform: translateY(0); }
-        100% { transform: translateY(-4px); }
-      }
-      
-      /* Base transitions */
+      /* Base - only color transitions */
       #lyrics-display .lyric-line {
-        transition: 
-          color 0.35s ease,
-          padding-top 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-          padding-bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-          transform 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transition: color 0.4s ease !important;
       }
       
-      /* Past lines - cascade animation */
+      /* Past lines - move first, gap forms ahead */
       #lyrics-display .lyric-line.lyric-past {
         color: rgba(255, 248, 230, 0.85) !important;
         text-align: left !important;
         font-style: normal !important;
         font-weight: 700 !important;
-        padding-top: 0.4rem !important;
-        padding-bottom: 0.4rem !important;
-        animation: past-line-slide 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+        animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards !important;
+        animation-delay: 0s !important;
       }
       
-      /* Cascading delays for past lines */
-      #lyrics-display .lyric-line.lyric-past:nth-last-of-type(1) { animation-delay: 0s; }
-      #lyrics-display .lyric-line.lyric-past:nth-last-of-type(2) { animation-delay: 0.08s; }
-      #lyrics-display .lyric-line.lyric-past:nth-last-of-type(3) { animation-delay: 0.16s; }
-      #lyrics-display .lyric-line.lyric-past:nth-last-of-type(4) { animation-delay: 0.24s; }
-      #lyrics-display .lyric-line.lyric-past:nth-last-of-type(5) { animation-delay: 0.32s; }
-      
-      /* Current line - large gap, slides up */
+      /* Current line - waits, natural gap from delay */
       #lyrics-display .lyric-line.lyric-current {
         color: #fff8e6 !important;
         text-align: left !important;
         font-style: normal !important;
         font-weight: 700 !important;
-        padding-top: 2rem !important;
-        padding-bottom: 2rem !important;
-        animation: current-line-enter 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+        animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards !important;
+        animation-delay: 0.2s !important;
       }
       
-      /* Future lines - static with cascade delays */
+      /* Future lines - cascade timing creates wave */
       #lyrics-display .lyric-line.lyric-future {
         color: rgba(255, 248, 230, 0.35) !important;
         text-align: left !important;
         font-style: normal !important;
         font-weight: 700 !important;
-        padding-top: 0.4rem !important;
-        padding-bottom: 0.4rem !important;
+        animation: line-slide-up 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards !important;
       }
       
-      /* Cascading delays for future lines */
-      #lyrics-display .lyric-line.lyric-future:nth-of-type(1) { transition-delay: 0.1s; }
-      #lyrics-display .lyric-line.lyric-future:nth-of-type(2) { transition-delay: 0.18s; }
-      #lyrics-display .lyric-line.lyric-future:nth-of-type(3) { transition-delay: 0.26s; }
-      #lyrics-display .lyric-line.lyric-future:nth-of-type(4) { transition-delay: 0.34s; }
-      #lyrics-display .lyric-line.lyric-future:nth-of-type(5) { transition-delay: 0.42s; }
+      /* Staggered delays - visible cascade effect */
+      #lyrics-display .lyric-line.lyric-future:nth-of-type(1) { animation-delay: 0.35s !important; }
+      #lyrics-display .lyric-line.lyric-future:nth-of-type(2) { animation-delay: 0.5s !important; }
+      #lyrics-display .lyric-line.lyric-future:nth-of-type(3) { animation-delay: 0.65s !important; }
+      #lyrics-display .lyric-line.lyric-future:nth-of-type(4) { animation-delay: 0.8s !important; }
+      #lyrics-display .lyric-line.lyric-future:nth-of-type(5) { animation-delay: 0.95s !important; }
       
       /* Hover effect */
       #lyrics-display .lyric-line:hover {
