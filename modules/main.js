@@ -343,12 +343,18 @@ class YouTubeLyricsApp {
   setupEventHandlers() {
     // Sync events
     this.sync.onUpdate((data) => {
-      // Animate LyricsRenderer if available (Beautiful Lyrics mode)
-      if (this.lyricsRenderer) {
+      // Check if UI has an internal renderer (new modular approach)
+      const uiRenderer = this.ui.getRenderer();
+      if (uiRenderer) {
+        uiRenderer.Animate(data.currentTime, data.deltaTime || 1 / 60, data.skipped);
+      }
+      
+      // Fallback: Animate standalone LyricsRenderer if available (legacy)
+      if (this.lyricsRenderer && !uiRenderer) {
         this.lyricsRenderer.Animate(data.currentTime, data.deltaTime || 1 / 60, data.skipped);
       }
 
-      // Also update legacy UI for backward compatibility
+      // Update legacy UI for backward compatibility
       this.ui.updateCurrentLyric(data.currentIndex, data.currentTime, data.indexChanged);
 
       // Update progress bar
@@ -940,9 +946,10 @@ class YouTubeLyricsApp {
     // Display lyrics using legacy UI
     this.ui.displaySyncedLyrics(this.currentLyrics);
 
-    // Create Beautiful Lyrics-style renderer (in addition to legacy UI)
-    // This enables advanced features like interludes and syllable sync
-    this._createLyricsRenderer(this.currentLyrics);
+    // The LyricsRenderer is now optionally integrated into ui.js
+    // Enable renderer mode for advanced features (currently disabled by default)
+    // To enable: this.ui.setUseRenderer(true);
+    // this._createLyricsRenderer(this.currentLyrics);
 
     // Apply stored font size
     const storedFontSize = this.settings.get('fontSize');

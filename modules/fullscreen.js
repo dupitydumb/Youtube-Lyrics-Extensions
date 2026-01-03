@@ -1,11 +1,18 @@
 /**
  * Fullscreen Module - Handles fullscreen karaoke mode
+ * Uses Maid for resource cleanup and Signal for event handling
  */
 
 import { ColorExtractor } from './color-utils.js';
+import { Maid } from './utils/Maid.js';
+import { Signal } from './utils/Signal.js';
+import { LyricsRenderer } from './lyrics/LyricsRenderer.js';
 
 export class FullscreenManager {
   constructor(backgroundManager) {
+    // Initialize Maid for resource cleanup
+    this._maid = new Maid();
+    
     this.backgroundManager = backgroundManager;
     this.settings = null;
     this.overlay = null;
@@ -13,10 +20,34 @@ export class FullscreenManager {
     this.metadataOverlay = null;
     this.isActive = false;
     this.keyboardHandler = null;
-    this.onExitCallback = null;
     this.highlightMode = 'line'; // 'line' or 'word'
     this.metadataVisible = true;
     this.metadataHideTimeout = null;
+    
+    // Signals for event communication
+    this.OnExit = new Signal();
+    this.OnSeekRequest = new Signal();
+    this.OnModeChange = new Signal();
+    
+    // LyricsRenderer instance (used when _useRenderer is true)
+    this._lyricsRenderer = null;
+    this._useRenderer = true; // Use modular LyricsRenderer for shared code with regular panel
+  }
+
+  /**
+   * Enable or disable using LyricsRenderer for lyrics display
+   * @param {boolean} use - Whether to use LyricsRenderer
+   */
+  setUseRenderer(use) {
+    this._useRenderer = use;
+  }
+
+  /**
+   * Get the internal LyricsRenderer instance (if using renderer mode)
+   * @returns {LyricsRenderer|null}
+   */
+  getRenderer() {
+    return this._lyricsRenderer;
   }
 
   /**
@@ -53,7 +84,7 @@ export class FullscreenManager {
       box-sizing: border-box;
     `;
 
-    // Hide scrollbar for webkit browsers
+    // Hide scrollbar and apply Apple Music fullscreen lyrics styles
     const style = document.createElement('style');
     style.textContent = `
       #fullscreen-lyrics-container::-webkit-scrollbar {
@@ -64,12 +95,57 @@ export class FullscreenManager {
       #fullscreen-lyrics-container {
         scrollbar-width: none !important;
         -ms-overflow-style: none !important;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
       }
       #fullscreen-lyrics-wrapper {
         min-height: 100%;
         display: flex;
         flex-direction: column;
         justify-content: center;
+      }
+      
+      /* Apple Music Fullscreen Typography */
+      #fullscreen-lyrics-container .lyric-line,
+      #fullscreen-lyrics-container .VocalsGroup {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+        font-size: 2.5rem !important;
+        font-weight: 700 !important;
+        line-height: 1.3 !important;
+        letter-spacing: -0.02em !important;
+        color: rgba(255, 255, 255, 0.35) !important;
+        padding: 0.6rem 0 !important;
+        text-align: left !important;
+        transition: color 0.4s ease, transform 0.4s ease, opacity 0.4s ease !important;
+      }
+      
+      #fullscreen-lyrics-container .lyric-line.lyric-current,
+      #fullscreen-lyrics-container .VocalsGroup.lyric-current {
+        color: #ffffff !important;
+        font-weight: 800 !important;
+        font-size: 2.75rem !important;
+      }
+      
+      #fullscreen-lyrics-container .lyric-line.lyric-past,
+      #fullscreen-lyrics-container .VocalsGroup.lyric-past {
+        color: rgba(255, 255, 255, 0.4) !important;
+        font-weight: 700 !important;
+      }
+      
+      #fullscreen-lyrics-container .lyric-line.lyric-future,
+      #fullscreen-lyrics-container .VocalsGroup.lyric-future {
+        color: rgba(255, 255, 255, 0.35) !important;
+        font-weight: 700 !important;
+      }
+      
+      /* Word highlighting for fullscreen */
+      #fullscreen-lyrics-container .lyric-word {
+        font-family: inherit !important;
+        font-weight: 700 !important;
+      }
+      
+      #fullscreen-lyrics-container .lyric-word.highlighted,
+      #fullscreen-lyrics-container .lyric-word.past {
+        font-weight: 800 !important;
       }
     `;
     this.overlay.appendChild(style);
@@ -231,6 +307,10 @@ export class FullscreenManager {
   exit() {
     if (!this.isActive || !this.overlay) return;
 
+    // Clean up all tracked resources via Maid
+    this._maid.Destroy();
+    this._maid = new Maid();
+
     // Cancel metadata auto-hide timeout
     if (this.metadataHideTimeout) {
       clearTimeout(this.metadataHideTimeout);
@@ -253,21 +333,13 @@ export class FullscreenManager {
         moviePlayer.style.pointerEvents = 'auto';
       }
 
-      // Remove keyboard handler
-      if (this.keyboardHandler) {
-        document.removeEventListener('keydown', this.keyboardHandler);
-        this.keyboardHandler = null;
-      }
-
       this.overlay = null;
       this.lyricsContainer = null;
       this.metadataOverlay = null;
       this.isActive = false;
 
-      // Call exit callback if set
-      if (this.onExitCallback) {
-        this.onExitCallback();
-      }
+      // Fire exit signal for listeners
+      this.OnExit.Fire();
     }, 300);
   }
 
@@ -307,7 +379,7 @@ export class FullscreenManager {
   }
 
   /**
-   * Setup keyboard event handler
+   * Setup keyboard event handler using Maid for cleanup
    */
   setupKeyboardHandler() {
     this.keyboardHandler = (e) => {
@@ -327,7 +399,8 @@ export class FullscreenManager {
       }
     };
 
-    document.addEventListener('keydown', this.keyboardHandler);
+    // Use Maid to track the listener for automatic cleanup
+    this._maid.GiveListener(document, 'keydown', this.keyboardHandler);
   }
 
   /**
@@ -339,9 +412,12 @@ export class FullscreenManager {
 
   /**
    * Set callback for when fullscreen exits
+   * Now uses Signal for cleaner event handling
+   * @param {Function} callback - Function to call on exit
+   * @returns {Function} Disconnect function to remove the listener
    */
   onExit(callback) {
-    this.onExitCallback = callback;
+    return this.OnExit.Connect(callback);
   }
 
   /**
@@ -401,6 +477,7 @@ export class FullscreenManager {
 
   /**
    * Display lyrics in fullscreen container
+   * Uses LyricsRenderer if _useRenderer is true, otherwise uses legacy rendering
    */
   displayLyricsInFullscreen(lyrics) {
     if (!this.lyricsContainer) return;
@@ -408,8 +485,68 @@ export class FullscreenManager {
     // Clear cache when displaying new lyrics
     this._cachedFullscreenLines = null;
 
+    // Destroy any existing renderer
+    if (this._lyricsRenderer) {
+      this._lyricsRenderer.Destroy();
+      this._lyricsRenderer = null;
+    }
+
     this.lyricsContainer.replaceChildren();
 
+    // Use LyricsRenderer if enabled
+    if (this._useRenderer) {
+      this._displayWithRenderer(lyrics);
+      return;
+    }
+
+    // Legacy rendering path
+    this._displayLegacy(lyrics);
+  }
+
+  /**
+   * Display lyrics using the modular LyricsRenderer
+   * @private
+   */
+  _displayWithRenderer(lyrics) {
+    try {
+      // Create wrapper for proper centering and scrolling
+      const wrapper = document.createElement('div');
+      wrapper.id = 'fullscreen-lyrics-wrapper';
+      wrapper.style.paddingTop = '40vh';
+      wrapper.style.paddingBottom = '40vh';
+      this.lyricsContainer.appendChild(wrapper);
+
+      this._lyricsRenderer = new LyricsRenderer(wrapper, lyrics, {
+        highlightMode: this.highlightMode,
+        showRomanization: this.settings?.showRomanization || false,
+        hideOriginalLyrics: this.settings?.hideOriginalLyrics || false,
+        detectInterludes: true,
+        interludeThreshold: 5
+      });
+
+      // Connect renderer's seek signal to our signal and video element
+      this._lyricsRenderer.OnSeekRequest.Connect((time, index) => {
+        this.OnSeekRequest.Fire(time, index);
+        
+        const videoElement = document.querySelector('video');
+        if (videoElement) {
+          videoElement.currentTime = time;
+        }
+      });
+
+      console.log('[Fullscreen] Using LyricsRenderer for display');
+    } catch (error) {
+      console.warn('[Fullscreen] Failed to create LyricsRenderer, falling back to legacy:', error);
+      this._lyricsRenderer = null;
+      this._displayLegacy(lyrics);
+    }
+  }
+
+  /**
+   * Legacy display method for fullscreen lyrics
+   * @private
+   */
+  _displayLegacy(lyrics) {
     // Create wrapper for proper centering and scrolling
     const wrapper = document.createElement('div');
     wrapper.id = 'fullscreen-lyrics-wrapper';
@@ -532,8 +669,10 @@ export class FullscreenManager {
         }
       }
 
-      // Click to seek
-      lyricLine.addEventListener('click', () => {
+      // Click to seek - track listener with Maid
+      this._maid.GiveListener(lyricLine, 'click', () => {
+        this.OnSeekRequest.Fire(lyric.time, index);
+        
         const videoElement = document.querySelector('video');
         if (videoElement) {
           videoElement.currentTime = lyric.time;
@@ -548,9 +687,17 @@ export class FullscreenManager {
 
   /**
    * Update current lyric highlight in fullscreen
+   * If using LyricsRenderer, delegates to its Animate method
    */
   updateCurrentLyric(currentIndex, currentTime, indexChanged = true) {
     if (!this.lyricsContainer) return;
+
+    // If using LyricsRenderer, use its animation system
+    if (this._lyricsRenderer && this._useRenderer) {
+      // LyricsRenderer.Animate expects (timestamp, deltaTime, skipped)
+      this._lyricsRenderer.Animate(currentTime || 0, 1/60, indexChanged);
+      return;
+    }
 
     // Cache lines for performance
     if (indexChanged || !this._cachedFullscreenLines) {
@@ -600,8 +747,13 @@ export class FullscreenManager {
             const wordSpans = line.querySelectorAll('.lyric-word');
             if (this.highlightMode === 'line') {
               wordSpans.forEach(w => {
-                w.style.color = '#ffffff';
+                // Apply gradient-based coloring for line mode (fully highlighted)
+                w.style.color = 'transparent';
+                w.style.backgroundClip = 'text';
+                w.style.webkitBackgroundClip = 'text';
+                w.style.backgroundImage = 'linear-gradient(to right, #ffffff 0%, #ffffff 100%)';
                 w.style.fontWeight = '700';
+                w.style.setProperty('--word-progress', '100%');
               });
             } else {
               // In word mode, set initial state for words on current line
@@ -610,8 +762,13 @@ export class FullscreenManager {
               wordSpans.forEach(w => {
                 const wordState = w.dataset.state || 'future';
                 if (wordState === 'future') {
-                  w.style.color = 'rgba(255, 255, 255, 0.4)';
+                  const futureColor = 'rgba(255, 255, 255, 0.4)';
+                  w.style.color = 'transparent';
+                  w.style.backgroundClip = 'text';
+                  w.style.webkitBackgroundClip = 'text';
+                  w.style.backgroundImage = `linear-gradient(to right, ${futureColor} 0%, ${futureColor} 100%)`;
                   w.style.fontWeight = '500';
+                  w.style.setProperty('--word-progress', '0%');
                 }
               });
             }
@@ -665,11 +822,17 @@ export class FullscreenManager {
             });
             const wordSpans2 = line.querySelectorAll('.lyric-word');
             wordSpans2.forEach(w => {
-              w.style.color = fadedColor;
+              // Apply gradient-based coloring for non-current lines
+              w.style.color = 'transparent';
+              w.style.backgroundClip = 'text';
+              w.style.webkitBackgroundClip = 'text';
+              w.style.backgroundImage = `linear-gradient(to right, ${fadedColor} 0%, ${fadedColor} 100%)`;
               w.style.fontWeight = '600';
               // Clear any word-level highlighting state
               w.classList.remove('highlighted', 'active');
               w.classList.add(isPast ? 'past' : 'future');
+              w.dataset.state = isPast ? 'past' : 'future';
+              w.style.setProperty('--word-progress', isPast ? '100%' : '0%');
               w.style.textShadow = 'none';
               w.style.transform = 'scale(1) translateZ(0)';
             });
@@ -714,66 +877,76 @@ export class FullscreenManager {
           }
         }
 
-        // Only update if the active word changed or it's a new line
-        if (this._lastActiveWordIndex !== activeWordIndex || indexChanged) {
-          this._lastActiveWordIndex = activeWordIndex;
+        // Update words - always update progress for active word
+        words.forEach((word, wordIndex) => {
+          const wordTime = parseFloat(word.dataset.wordTime);
 
-          words.forEach((word, wordIndex) => {
-            // Skip if we shouldn't update (optimization could be deeper but this is cleaner)
-            const wordTime = parseFloat(word.dataset.wordTime);
-            const timeDiff = currentTime - wordTime;
+          // Check current state to avoid redundant style writes
+          const currentState = word.dataset.state || 'future';
+          let newState = 'future';
 
-            // Check current state to avoid redundant style writes
-            const currentState = word.dataset.state || 'future';
-            let newState = 'future';
+          if (wordIndex === activeWordIndex) {
+            newState = 'active';
+          } else if (wordIndex < activeWordIndex) {
+            newState = 'past';
+          } else {
+            newState = 'future';
+          }
 
-            if (wordIndex === activeWordIndex) {
-              newState = 'active';
-            } else if (wordIndex < activeWordIndex) {
-              newState = 'past';
-            } else {
-              newState = 'future';
+          // Calculate progress for current word
+          let progress = 0;
+          if (newState === 'active') {
+            const nextWord = words[wordIndex + 1];
+            const wordEndTime = nextWord ? (parseFloat(nextWord.dataset.wordTime) || wordTime + 1) : wordTime + 1;
+            const wordDuration = wordEndTime - wordTime;
+            const elapsed = currentTime - wordTime;
+            progress = Math.min(100, Math.max(0, (elapsed / wordDuration) * 100));
+          } else if (newState === 'past') {
+            progress = 100;
+          }
+
+          // Always update progress for active word (continuous animation), or update when state changes
+          const needsUpdate = currentState !== newState || newState === 'active' || indexChanged;
+          
+          if (needsUpdate) {
+            word.dataset.state = newState;
+            word.style.setProperty('--word-progress', `${progress}%`);
+
+            // Apply gradient-based progressive fill
+            word.style.color = 'transparent';
+            word.style.backgroundClip = 'text';
+            word.style.webkitBackgroundClip = 'text';
+
+            if (newState === 'active') { // Active word - progressive fill
+              const highlightColor = '#ffffff';
+              const futureColor = 'rgba(255, 255, 255, 0.3)';
+              word.style.backgroundImage = `linear-gradient(to right, ${highlightColor} 0%, ${highlightColor} ${progress}%, ${futureColor} ${progress}%, ${futureColor} 100%)`;
+              word.style.textShadow = '0 0 20px rgba(255, 255, 255, 0.4)';
+              word.style.transform = 'scale(1.02) translateZ(0)';
+              word.style.fontWeight = '700';
+              word.style.filter = 'blur(0px)';
+
+            } else if (newState === 'past') { // Past word - fully filled but dimmed
+              const pastColor = 'rgba(255, 255, 255, 0.5)';
+              word.style.backgroundImage = `linear-gradient(to right, ${pastColor} 0%, ${pastColor} 100%)`;
+              word.style.textShadow = 'none';
+              word.style.transform = 'scale(1) translateZ(0)';
+              word.style.fontWeight = '500';
+              word.style.filter = 'blur(0px)';
+
+            } else { // Future word - no fill
+              const futureColor = 'rgba(255, 255, 255, 0.3)';
+              word.style.backgroundImage = `linear-gradient(to right, ${futureColor} 0%, ${futureColor} 100%)`;
+              word.style.textShadow = 'none';
+              word.style.transform = 'scale(1) translateZ(0)';
+              word.style.fontWeight = '400';
+              word.style.filter = 'blur(0px)';
             }
-
-            // Only write to DOM if state changed, it's the active word, or line just changed
-            if (currentState !== newState || newState === 'active' || indexChanged) {
-              word.dataset.state = newState;
-
-              if (newState === 'active') { // Active word - spring animation
-                const staggerDelay = Math.min(wordIndex * 0.05, 0.3);
-
-                // Only trigger animation start once
-                if (currentState !== 'active') {
-                  word.style.animation = 'none';
-                  void word.offsetWidth; // Trigger reflow
-                  word.style.animation = `word-spring-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) ${staggerDelay}s`;
-                }
-
-                word.style.color = '#ffffff';
-                word.style.textShadow = '0 0 20px rgba(255, 255, 255, 0.6), 0 0 40px rgba(255, 255, 255, 0.3)';
-                word.style.transform = 'scale(1.08) translateY(-1px) translateZ(0)';
-                word.style.fontWeight = '700';
-                word.style.filter = 'blur(0px)';
-
-              } else if (newState === 'past') { // Past word
-                word.style.animation = 'none';
-                word.style.color = 'rgba(255, 255, 255, 0.5)';
-                word.style.textShadow = 'none';
-                word.style.transform = 'scale(1) translateZ(0)';
-                word.style.fontWeight = '400';
-                word.style.filter = 'blur(0px)';
-
-              } else { // Future word
-                word.style.animation = 'none';
-                word.style.color = 'rgba(255, 255, 255, 0.3)';
-                word.style.textShadow = 'none';
-                word.style.transform = 'scale(1) translateZ(0)';
-                word.style.fontWeight = '400';
-                word.style.filter = 'blur(0px)';
-              }
-            }
-          });
-        }
+          }
+        });
+        
+        // Update last active word index
+        this._lastActiveWordIndex = activeWordIndex;
       }
     }
   }

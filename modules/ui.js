@@ -1,12 +1,20 @@
 import { SELECTORS, UI_CONFIG } from './constants.js';
 import { ColorExtractor } from './color-utils.js';
+import { Maid } from './utils/Maid.js';
+import { Signal } from './utils/Signal.js';
+import { LyricsRenderer } from './lyrics/LyricsRenderer.js';
 
 /**
  * UI Module - Handles all UI creation and manipulation with Apple Music styling
+ * Now uses Maid for resource cleanup, Signal for event handling,
+ * and can optionally use LyricsRenderer for advanced lyrics display.
  */
 
 export class LyricsUI {
   constructor() {
+    // Initialize Maid for resource cleanup
+    this._maid = new Maid();
+    
     this.panel = null;
     this.container = null;
     this.lyricsContainer = null;
@@ -15,8 +23,16 @@ export class LyricsUI {
     this.settingsRef = null; // Store settings reference for updates
     this.currentFontSize = 16; // Store current font size
     this.highlightMode = 'line'; // 'line' or 'word'
-    // Internal listener tracking to allow cleanup and avoid leaks
-    this._listeners = [];
+    
+    // Signals for event communication
+    this.OnSeekRequest = new Signal();
+    this.OnSettingsChange = new Signal();
+    this.OnModeChange = new Signal();
+    
+    // LyricsRenderer instance (used when useRenderer is true)
+    this._lyricsRenderer = null;
+    this._useRenderer = true; // Use modular LyricsRenderer for shared code with fullscreen
+    
     this._lyricsStyleElement = null;
     this._cachedLines = null;
     this._scrollTimeout = null;
@@ -33,6 +49,22 @@ export class LyricsUI {
     this.progressBar = null;
     this.blurredBackground = null;
     this.adaptiveColors = null;
+  }
+
+  /**
+   * Enable or disable using LyricsRenderer for lyrics display
+   * @param {boolean} use - Whether to use LyricsRenderer
+   */
+  setUseRenderer(use) {
+    this._useRenderer = use;
+  }
+
+  /**
+   * Get the internal LyricsRenderer instance (if using renderer mode)
+   * @returns {LyricsRenderer|null}
+   */
+  getRenderer() {
+    return this._lyricsRenderer;
   }
 
   /**
@@ -182,29 +214,18 @@ export class LyricsUI {
   }
 
   /**
-   * Helper to add an event listener and track it for later removal
+   * Helper to add an event listener and track it for later removal using Maid
    */
   addListener(target, type, handler, options) {
-    try {
-      target.addEventListener(type, handler, options);
-      this._listeners.push({ target, type, handler, options });
-    } catch (e) {
-      // ignore
-    }
+    return this._maid.GiveListener(target, type, handler, options);
   }
 
   /**
-   * Remove all tracked listeners
+   * Remove all tracked listeners (now handled by Maid)
+   * @deprecated Use destroy() instead
    */
   removeAllListeners() {
-    try {
-      this._listeners.forEach(({ target, type, handler, options }) => {
-        try { target.removeEventListener(type, handler, options); } catch (e) { }
-      });
-    } catch (e) {
-      // ignore
-    }
-    this._listeners = [];
+    // Maid handles this now - this is a no-op for backward compatibility
   }
 
   /**
@@ -353,11 +374,31 @@ export class LyricsUI {
         color: #ffffff !important;
       }
       
-      /* Word highlighting */
-      #lyrics-display .lyric-word { display: inline; transition: color 0.15s ease; }
-      #lyrics-display .lyric-word.highlighted { color: #ffffff !important; font-weight: 700 !important; }
-      #lyrics-display .lyric-word.past { color: rgba(255, 255, 255, 0.5) !important; font-weight: 500 !important; }
-      #lyrics-display .lyric-word.future { color: rgba(255, 255, 255, 0.35) !important; font-weight: 400 !important; }
+      /* Word highlighting - Apple Music bold style */
+      #lyrics-display .lyric-word {
+        --word-progress: 0%;
+        --highlight-color: #ffffff;
+        --future-color: rgba(255, 255, 255, 0.35);
+        display: inline;
+        font-family: inherit !important;
+        font-weight: 700 !important;
+        color: transparent !important;
+        background-clip: text !important;
+        -webkit-background-clip: text !important;
+        transition: transform 0.15s ease;
+      }
+      #lyrics-display .lyric-word.highlighted {
+        background-image: linear-gradient(to right, var(--highlight-color) 0%, var(--highlight-color) var(--word-progress), var(--future-color) var(--word-progress), var(--future-color) 100%) !important;
+        font-weight: 800 !important;
+      }
+      #lyrics-display .lyric-word.past {
+        background-image: linear-gradient(to right, var(--highlight-color) 0%, var(--highlight-color) 100%) !important;
+        font-weight: 800 !important;
+      }
+      #lyrics-display .lyric-word.future {
+        background-image: linear-gradient(to right, var(--future-color) 0%, var(--future-color) 100%) !important;
+        font-weight: 700 !important;
+      }
       
       /* Title visibility */
       #song-title, #song-artist { opacity: 1 !important; visibility: visible !important; }
@@ -506,6 +547,7 @@ export class LyricsUI {
 
   /**
    * Display synced lyrics with Apple Music styling
+   * Uses LyricsRenderer if _useRenderer is true, otherwise uses legacy rendering
    */
   displaySyncedLyrics(syncedLyrics) {
     if (!this.lyricsContainer) return;
@@ -513,9 +555,63 @@ export class LyricsUI {
     // Clear cache when displaying new lyrics
     this._cachedLines = null;
 
+    // Destroy any existing renderer
+    if (this._lyricsRenderer) {
+      this._lyricsRenderer.Destroy();
+      this._lyricsRenderer = null;
+    }
+
     // Clear using replaceChildren for Trusted Types compatibility
     this.lyricsContainer.replaceChildren();
 
+    // Use LyricsRenderer if enabled
+    if (this._useRenderer) {
+      this._displayWithRenderer(syncedLyrics);
+      return;
+    }
+
+    // Legacy rendering path
+    this._displayLegacy(syncedLyrics);
+  }
+
+  /**
+   * Display lyrics using the modular LyricsRenderer
+   * @private
+   */
+  _displayWithRenderer(syncedLyrics) {
+    try {
+      this._lyricsRenderer = new LyricsRenderer(this.lyricsContainer, syncedLyrics, {
+        highlightMode: this.highlightMode,
+        showRomanization: this.settingsRef?.showRomanization || false,
+        hideOriginalLyrics: this.settingsRef?.hideOriginalLyrics || false,
+        detectInterludes: true,
+        interludeThreshold: 5
+      });
+
+      // Connect renderer's seek signal to our signal
+      this._lyricsRenderer.OnSeekRequest.Connect((time, index) => {
+        this.OnSeekRequest.Fire(time, index);
+        
+        // Also dispatch DOM event for legacy compatibility
+        const event = new CustomEvent('lyric-seek', {
+          detail: { index, time }
+        });
+        document.dispatchEvent(event);
+      });
+
+      console.log('[UI] Using LyricsRenderer for display');
+    } catch (error) {
+      console.warn('[UI] Failed to create LyricsRenderer, falling back to legacy:', error);
+      this._lyricsRenderer = null;
+      this._displayLegacy(syncedLyrics);
+    }
+  }
+
+  /**
+   * Legacy display method for synced lyrics
+   * @private
+   */
+  _displayLegacy(syncedLyrics) {
     // Add padding spacers to allow first/last lyrics to scroll to center
     const topSpacer = document.createElement('div');
     topSpacer.style.height = '120px';
@@ -582,8 +678,12 @@ export class LyricsUI {
       // NO inline styles - let CSS handle everything
       // Just add class and data attributes
 
-      // Click to seek
-      lyricLine.addEventListener('click', () => {
+      // Click to seek - use both Signal and DOM event for compatibility
+      this._maid.GiveListener(lyricLine, 'click', () => {
+        // Fire signal for modern listeners
+        this.OnSeekRequest.Fire(lyric.time, index);
+        
+        // Also dispatch DOM event for legacy compatibility
         const event = new CustomEvent('lyric-seek', {
           detail: { index, time: lyric.time }
         });
@@ -602,8 +702,17 @@ export class LyricsUI {
 
   /**
    * Update current lyric highlight with smooth animations
+   * If using LyricsRenderer, delegates to its Animate method
    */
   updateCurrentLyric(currentIndex, currentTime = null, indexChanged = true) {
+    // If using LyricsRenderer, use its animation system
+    if (this._lyricsRenderer && this._useRenderer) {
+      // LyricsRenderer.Animate expects (timestamp, deltaTime, skipped)
+      // We approximate deltaTime as 1/60 for 60fps
+      this._lyricsRenderer.Animate(currentTime || 0, 1/60, indexChanged);
+      return;
+    }
+    
     // Coalesce multiple rapid updates into a single rAF and perform optimized update
     this.scheduleUpdate(currentIndex, currentTime, indexChanged);
   }
@@ -624,15 +733,17 @@ export class LyricsUI {
       if (currentLine) {
         const words = currentLine.querySelectorAll('.lyric-word');
         if (mode === 'line') {
-          // In line mode, highlight all words on current line
+          // In line mode, highlight all words on current line (fully filled)
           words.forEach(w => {
             w.classList.remove('past', 'future');
             w.classList.add('highlighted');
+            w.style.setProperty('--word-progress', '100%');
           });
         } else {
           // In word mode, remove highlighted class to let word-by-word work
           words.forEach(w => {
             w.classList.remove('highlighted');
+            w.style.setProperty('--word-progress', '0%');
           });
         }
       }
@@ -653,6 +764,7 @@ export class LyricsUI {
       words.forEach(word => {
         word.classList.remove('highlighted', 'past', 'future');
         word.classList.add('highlighted'); // In line mode, all words are highlighted
+        word.style.setProperty('--word-progress', '100%'); // Fully filled for line mode
       });
       return;
     }
@@ -679,25 +791,29 @@ export class LyricsUI {
     // This fixes the issue where future words stayed highlighted
     wordArray.forEach((word, idx) => {
       if (idx < currentWordIndex) {
-        // Past words
+        // Past words - fully filled
         word.classList.remove('highlighted', 'future');
         word.classList.add('past');
+        word.style.setProperty('--word-progress', '100%');
       } else if (idx === currentWordIndex) {
-        // Current word
+        // Current word - calculate progress
         word.classList.add('highlighted');
         word.classList.remove('past', 'future');
 
-        // Add subtle pulse animation only when word changes
-        if (lastIdx !== currentWordIndex) {
-          word.style.animation = 'word-pulse 0.4s ease-out';
-          setTimeout(() => {
-            if (word) word.style.animation = '';
-          }, 400);
-        }
+        // Calculate progress within this word
+        const wordStartTime = parseFloat(word.dataset.wordTime) || 0;
+        const nextWord = wordArray[idx + 1];
+        const wordEndTime = nextWord ? (parseFloat(nextWord.dataset.wordTime) || wordStartTime + 1) : wordStartTime + 1;
+        const wordDuration = wordEndTime - wordStartTime;
+        const elapsed = currentTime - wordStartTime;
+        const progress = Math.min(100, Math.max(0, (elapsed / wordDuration) * 100));
+        
+        word.style.setProperty('--word-progress', `${progress}%`);
       } else {
-        // Future words
+        // Future words - no fill
         word.classList.remove('highlighted', 'past');
         word.classList.add('future');
+        word.style.setProperty('--word-progress', '0%');
       }
     });
 
@@ -1012,11 +1128,13 @@ export class LyricsUI {
   }
 
   /**
-   * Remove the panel
+   * Remove the panel and clean up resources
    */
   removePanel() {
-    // Remove any tracked listeners first
-    this.removeAllListeners();
+    // Create a new maid for the next panel instance
+    // This destroys all tracked listeners, timeouts, etc.
+    this._maid.Destroy();
+    this._maid = new Maid();
 
     // Remove injected style element for lyrics container
     if (this._lyricsStyleElement && this._lyricsStyleElement.parentNode) {
@@ -1031,6 +1149,18 @@ export class LyricsUI {
       this._scrollTimeout = null;
     }
 
+    // Cancel any pending rAF
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
+
+    // Cancel scroll animation
+    if (this._scrollAnimationId) {
+      cancelAnimationFrame(this._scrollAnimationId);
+      this._scrollAnimationId = null;
+    }
+
     if (this.container) {
       this.container.remove();
       this.container = null;
@@ -1038,6 +1168,23 @@ export class LyricsUI {
       this.lyricsContainer = null;
       this.controlsContainer = null;
     }
+
+    // Clear word index tracking
+    this._lastWordIndexMap.clear();
+    this._lastScrollIndex = -1;
+  }
+
+  /**
+   * Full cleanup - call when destroying the UI entirely
+   */
+  destroy() {
+    this.removePanel();
+    this.removeVideoPlayerControls();
+    
+    // Clear signals
+    this.OnSeekRequest.Clear();
+    this.OnSettingsChange.Clear();
+    this.OnModeChange.Clear();
   }
 
   /**

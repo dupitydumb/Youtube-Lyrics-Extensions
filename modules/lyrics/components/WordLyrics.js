@@ -208,7 +208,7 @@ export class WordLyrics {
     }
 
     /**
-     * Update word-by-word highlighting
+     * Update word-by-word highlighting with progressive fill
      * @param {number} timestamp - Current timestamp
      * @param {boolean} [skipped] - Whether playback was skipped
      */
@@ -233,41 +233,44 @@ export class WordLyrics {
             }
         }
 
-        // Skip if no change
-        if (currentWordIndex === this._lastWordIndex && !skipped) {
-            return;
-        }
-
         const previousWordIndex = this._lastWordIndex;
+        
+        // Check if word index changed
+        const wordChanged = currentWordIndex !== this._lastWordIndex;
+        
         this._lastWordIndex = currentWordIndex;
         this._currentWordIndex = currentWordIndex;
 
-        // Update word states
+        // Update word states and progress
         for (let i = 0; i < this._wordElements.length; i++) {
             const wordEl = this._wordElements[i];
             wordEl.classList.remove('highlighted', 'past', 'future');
 
             if (i < currentWordIndex) {
-                // Past words
+                // Past words - fully highlighted
                 wordEl.classList.add('past');
+                wordEl.style.setProperty('--word-progress', '100%');
             } else if (i === currentWordIndex) {
-                // Current word
+                // Current word - calculate progress within word
                 wordEl.classList.add('highlighted');
-
-                // Add pulse animation on word change (not on skip)
-                if (previousWordIndex !== currentWordIndex && !skipped) {
-                    wordEl.style.animation = 'word-pulse 0.4s ease-out';
-                    this._maid.GiveTimeout(() => {
-                        if (wordEl) wordEl.style.animation = '';
-                    }, 400);
-                }
+                
+                const wordStartTime = words[i].time;
+                const wordEndTime = (i < words.length - 1) ? words[i + 1].time : this._getEndTime();
+                const wordDuration = wordEndTime - wordStartTime;
+                const elapsed = timestamp - wordStartTime;
+                const progress = Math.min(100, Math.max(0, (elapsed / wordDuration) * 100));
+                
+                wordEl.style.setProperty('--word-progress', `${progress}%`);
             } else {
-                // Future words
+                // Future words - no highlight
                 wordEl.classList.add('future');
+                wordEl.style.setProperty('--word-progress', '0%');
             }
         }
 
-        this.OnWordChange.Fire(currentWordIndex, previousWordIndex);
+        if (wordChanged) {
+            this.OnWordChange.Fire(currentWordIndex, previousWordIndex);
+        }
     }
 
     /**
