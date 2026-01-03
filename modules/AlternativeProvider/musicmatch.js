@@ -146,7 +146,7 @@ class Musixmatch {
         if (data.message.header.status_code === 401) {
             console.log('[Musixmatch] Got 401 on getLrcById, clearing cached token');
             this.clearToken();
-            
+
             if (retryOnAuth) {
                 console.log('[Musixmatch] Retrying getLrcById with fresh token...');
                 return this.getLrcById(trackId, false);
@@ -195,7 +195,7 @@ class Musixmatch {
                 if (data.message.header.status_code === 401) {
                     console.log('[Musixmatch] Got 401 on richsync, clearing cached token');
                     this.clearToken();
-                    
+
                     if (retryOnAuth) {
                         console.log('[Musixmatch] Retrying richsync with fresh token...');
                         return this.getLrcWordByWord(trackId, false);
@@ -236,33 +236,16 @@ class Musixmatch {
     getBestMatch(tracks, searchTerm) {
         if (!tracks || tracks.length === 0) return null;
 
-        // Simple matching - compare search term with track name + artist
-        const normalized = searchTerm.toLowerCase();
-
-        let bestMatch = null;
-        let highestScore = 0;
-
-        for (const item of tracks) {
+        // Log all results for debugging
+        console.log('[Musixmatch] All search results:');
+        tracks.forEach((item, idx) => {
             const track = item.track;
-            const trackStr = `${track.track_name} ${track.artist_name}`.toLowerCase();
+            console.log(`  [${idx}] "${track.track_name}" by "${track.artist_name}" (ID: ${track.track_id})`);
+        });
 
-            // Simple scoring: count matching words
-            const searchWords = normalized.split(/\s+/);
-            let score = 0;
-
-            for (const word of searchWords) {
-                if (trackStr.includes(word)) {
-                    score++;
-                }
-            }
-
-            if (score > highestScore) {
-                highestScore = score;
-                bestMatch = item;
-            }
-        }
-
-        return bestMatch;
+        // Simply return the first result (most relevant from API)
+        console.log('[Musixmatch] Picking first result as best match');
+        return tracks[0];
     }
 
     async getLrc(searchTerm, retryOnAuth = true) {
@@ -283,7 +266,7 @@ class Musixmatch {
         if (statusCode === 401) {
             console.log('[Musixmatch] Got 401 on search, clearing cached token');
             this.clearToken();
-            
+
             if (retryOnAuth) {
                 console.log('[Musixmatch] Retrying search with fresh token...');
                 return this.getLrc(searchTerm, false); // Retry once with fresh token

@@ -111,6 +111,97 @@ class YouTubeLyricsApp {
     this.currentLyrics = null;
     this.albumArtUrl = null;
     this.currentProvider = null; // Track which provider supplied the lyrics
+
+    // Synced lyrics cache configuration
+    this.SYNCED_CACHE_KEY = 'syncedLyricsCache';
+    this.SYNCED_CACHE_MAX_SIZE = 100; // Maximum number of cached songs
+    this.SYNCED_CACHE_EXPIRY = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
+  }
+
+  /**
+   * Get cached synced lyrics for a query
+   * @param {string} query - Search query (song + artist)
+   * @returns {object|null} Cached lyrics data or null
+   */
+  getCachedSyncedLyrics(query) {
+    try {
+      const cacheKey = query.toLowerCase().trim();
+      const cacheStr = localStorage.getItem(this.SYNCED_CACHE_KEY);
+      if (!cacheStr) return null;
+
+      const cache = JSON.parse(cacheStr);
+      const entry = cache[cacheKey];
+
+      if (!entry) return null;
+
+      // Check if expired
+      if (Date.now() - entry.timestamp > this.SYNCED_CACHE_EXPIRY) {
+        console.log('[Cache] Entry expired, removing:', cacheKey);
+        delete cache[cacheKey];
+        localStorage.setItem(this.SYNCED_CACHE_KEY, JSON.stringify(cache));
+        return null;
+      }
+
+      console.log(`[Cache] HIT - Found cached synced lyrics from ${entry.provider}`);
+      return entry;
+    } catch (error) {
+      console.log('[Cache] Error reading cache:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Save synced lyrics to cache
+   * @param {string} query - Search query (song + artist)
+   * @param {string} syncedLyrics - LRC format synced lyrics
+   * @param {string} provider - Provider name (Musixmatch, Deezer, etc.)
+   * @param {object} metadata - Additional metadata (trackName, artistName)
+   */
+  saveSyncedLyricsToCache(query, syncedLyrics, provider, metadata = {}) {
+    try {
+      const cacheKey = query.toLowerCase().trim();
+      let cache = {};
+
+      const cacheStr = localStorage.getItem(this.SYNCED_CACHE_KEY);
+      if (cacheStr) {
+        cache = JSON.parse(cacheStr);
+      }
+
+      // Clean expired entries and enforce max size
+      const now = Date.now();
+      const entries = Object.entries(cache);
+
+      // Remove expired entries
+      for (const [key, value] of entries) {
+        if (now - value.timestamp > this.SYNCED_CACHE_EXPIRY) {
+          delete cache[key];
+        }
+      }
+
+      // If still too many, remove oldest
+      const remainingEntries = Object.entries(cache);
+      if (remainingEntries.length >= this.SYNCED_CACHE_MAX_SIZE) {
+        remainingEntries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+        const toRemove = remainingEntries.length - this.SYNCED_CACHE_MAX_SIZE + 1;
+        for (let i = 0; i < toRemove; i++) {
+          delete cache[remainingEntries[i][0]];
+        }
+      }
+
+      // Save new entry
+      cache[cacheKey] = {
+        synced: syncedLyrics,
+        provider: provider,
+        trackName: metadata.trackName || '',
+        artistName: metadata.artistName || '',
+        timestamp: now
+      };
+
+      localStorage.setItem(this.SYNCED_CACHE_KEY, JSON.stringify(cache));
+      console.log(`[Cache] Saved synced lyrics to cache: "${cacheKey}" (${provider})`);
+    } catch (error) {
+      console.log('[Cache] Error saving to cache:', error.message);
+    }
   }
 
   /**
@@ -405,7 +496,7 @@ class YouTubeLyricsApp {
 
   /**
    * Load lyrics for video with multi-strategy search
-   * Prioritizes Musixmatch provider, falls back to LRCLIB API
+   * New flow: Load from LRCLIB first (fast), then try Musixmatch in background for synced lyrics
    */
   async loadLyrics(videoInfo) {
     try {
@@ -475,134 +566,320 @@ class YouTubeLyricsApp {
         }
       ];
 
-      // PRIORITY 1: Try Musixmatch first with different strategies
-      let musixmatchResult = null;
+      // STEP 0: Check local cache first for synced lyrics
+      console.log('[Cache] Checking local cache for synced lyrics...');
+      for (const strategy of strategies) {
+        if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
+          continue;
+        }
+
+        const cached = this.getCachedSyncedLyrics(strategy.query);
+        if (cached && cached.synced) {
+          console.log(`[Cache] Using cached synced lyrics from ${cached.provider}`);
+          this.currentProvider = cached.provider + ' (cached)';
+          this.processProviderResults(
+            { synced: cached.synced },
+            videoInfo,
+            cached.trackName || strategy.songName || videoInfo.title,
+            cached.artistName || strategy.artistName || videoInfo.artist,
+            cached.provider + ' (cached)'
+          );
+          return;
+        }
+      }
+      console.log('[Cache] No cached synced lyrics found');
+
+      // STEP 1: Load from LRCLIB first (fast) - don't make user wait
+      console.log('[LRCLIB] Loading lyrics from LRCLIB first...');
+      let lrclibResults = null;
       let successfulStrategy = null;
-      let musixmatchRateLimited = false; // Track if Musixmatch is rate limited
 
       for (const strategy of strategies) {
         if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
           continue;
         }
 
-        // If Musixmatch is rate limited, skip remaining strategies
-        if (musixmatchRateLimited) {
-          console.log(`[Musixmatch] Skipping strategy ${strategy.name} due to rate limit, moving to fallback...`);
-          break;
-        }
-
         try {
-          console.log(`[Musixmatch] Trying strategy: ${strategy.name} with query: "${strategy.query}"`);
-          musixmatchResult = await this.musixmatch.getLrc(strategy.query);
-          console.log('[Musixmatch] Response:', JSON.stringify(musixmatchResult, null, 2));
+          console.log(`[LRCLIB] Trying strategy: ${strategy.name} with query: "${strategy.query}"`);
+          lrclibResults = await this.api.searchLyrics(strategy.query);
 
-          if (musixmatchResult && musixmatchResult.synced) {
-            console.log(`[Musixmatch] Found lyrics with strategy: ${strategy.name}`);
+          // Log all LRCLIB results
+          if (lrclibResults && lrclibResults.length > 0) {
+            console.log('[LRCLIB] All search results:');
+            lrclibResults.forEach((result, idx) => {
+              console.log(`  [${idx}] "${result.trackName}" by "${result.artistName}" (synced: ${!!result.syncedLyrics}, plain: ${!!result.plainLyrics})`);
+            });
             successfulStrategy = strategy;
             break;
           }
         } catch (error) {
-          console.log(`[Musixmatch] Strategy ${strategy.name} failed:`, error.message);
-          // Check if this is a rate limit/token error - if so, skip remaining Musixmatch strategies
-          if (error.message.includes('token') || error.message.includes('401') || error.message.includes('rate') || error.message.includes('retries')) {
-            console.log('[Musixmatch] Rate limited or token error detected, skipping remaining strategies...');
-            musixmatchRateLimited = true;
-          }
+          console.log(`[LRCLIB] Strategy ${strategy.name} failed:`, error.message);
           continue;
         }
       }
 
-      // If Musixmatch found lyrics, process them
-      if (musixmatchResult && musixmatchResult.synced) {
-        this.currentProvider = 'Musixmatch';
-        this.processProviderResults(
-          musixmatchResult,
+      // Display LRCLIB lyrics immediately if found
+      if (lrclibResults && lrclibResults.length > 0) {
+        console.log('[LRCLIB] Displaying lyrics immediately');
+        this.currentProvider = 'LRCLIB';
+        this.processLyricsResults(
+          lrclibResults,
           videoInfo,
           successfulStrategy ? successfulStrategy.songName : videoInfo.title,
           successfulStrategy ? successfulStrategy.artistName : videoInfo.artist,
-          'Musixmatch'
+          'LRCLIB'
         );
+
+        // STEP 2: In background, try to fetch synced lyrics from Musixmatch
+        // This won't block the UI - user already sees LRCLIB lyrics
+        this.fetchSyncedLyricsInBackground(videoInfo, strategies, successfulStrategy);
         return;
       }
 
-      // PRIORITY 2: Try Deezer as fallback
-      console.log('[Deezer] Trying Deezer as fallback...');
-      let deezerResult = null;
-
-      for (const strategy of strategies) {
-        if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
-          continue;
-        }
-
-        try {
-          console.log(`[Deezer] Trying strategy: ${strategy.name} with query: "${strategy.query}"`);
-          deezerResult = await this.deezer.getLrc(strategy.query);
-
-          if (deezerResult && deezerResult.synced) {
-            console.log(`[Deezer] Found lyrics with strategy: ${strategy.name}`);
-            successfulStrategy = strategy;
-            break;
-          }
-        } catch (error) {
-          console.log(`[Deezer] Strategy ${strategy.name} failed:`, error.message);
-          continue;
-        }
-      }
-
-      // If Deezer found lyrics, process them
-      if (deezerResult && deezerResult.synced) {
-        this.currentProvider = 'Deezer';
-        this.processProviderResults(
-          deezerResult,
-          videoInfo,
-          successfulStrategy ? successfulStrategy.songName : videoInfo.title,
-          successfulStrategy ? successfulStrategy.artistName : videoInfo.artist,
-          'Deezer'
-        );
-        return;
-      }
-
-      // PRIORITY 3: Fall back to LRCLIB API
-      console.log('[LRCLIB] Falling back to LRCLIB API...');
-      let results = null;
-
-      for (const strategy of strategies) {
-        if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
-          continue;
-        }
-
-        try {
-          results = await this.api.searchLyrics(strategy.query);
-
-          if (results && results.length > 0) {
-            successfulStrategy = strategy;
-            break;
-          }
-        } catch (error) {
-          // Continue to next strategy
-          continue;
-        }
-      }
-
-      if (!results || results.length === 0) {
-        this.ui.showError('No lyrics found for this song');
-        return;
-      }
-
-      // Process results with enhanced metadata
-      this.currentProvider = 'LRCLIB';
-      this.processLyricsResults(
-        results,
-        videoInfo,
-        successfulStrategy ? successfulStrategy.songName : videoInfo.title,
-        successfulStrategy ? successfulStrategy.artistName : videoInfo.artist,
-        'LRCLIB'
-      );
+      // If LRCLIB fails, try providers directly (user will have to wait)
+      console.log('[Lyrics] LRCLIB found nothing, trying alternative providers...');
+      await this.loadFromAlternativeProviders(videoInfo, strategies);
 
     } catch (error) {
       console.error('[Lyrics] Failed to load lyrics:', error);
       this.ui.showError('Failed to load lyrics');
     }
+  }
+
+  /**
+   * Fetch synced lyrics from Musixmatch/Deezer in background
+   * If found, replaces current LRCLIB lyrics with synced version
+   */
+  async fetchSyncedLyricsInBackground(videoInfo, strategies, originalStrategy) {
+    console.log('[Background] Fetching synced lyrics from providers in background...');
+
+    // Try Musixmatch first
+    let musixmatchResult = null;
+    let musixmatchRateLimited = false;
+    let successfulStrategy = null;
+
+    for (const strategy of strategies) {
+      if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
+        continue;
+      }
+
+      if (musixmatchRateLimited) {
+        console.log(`[Background/Musixmatch] Skipping strategy ${strategy.name} due to rate limit...`);
+        break;
+      }
+
+      try {
+        console.log(`[Background/Musixmatch] Trying strategy: ${strategy.name} with query: "${strategy.query}"`);
+        musixmatchResult = await this.musixmatch.getLrc(strategy.query);
+
+        if (musixmatchResult && musixmatchResult.synced) {
+          console.log(`[Background/Musixmatch] Found synced lyrics with strategy: ${strategy.name}`);
+          successfulStrategy = strategy;
+          break;
+        }
+      } catch (error) {
+        console.log(`[Background/Musixmatch] Strategy ${strategy.name} failed:`, error.message);
+        if (error.message.includes('token') || error.message.includes('401') || error.message.includes('rate') || error.message.includes('retries')) {
+          console.log('[Background/Musixmatch] Rate limited, skipping remaining strategies...');
+          musixmatchRateLimited = true;
+        }
+        continue;
+      }
+    }
+
+    // If Musixmatch found synced lyrics, replace current lyrics and cache
+    if (musixmatchResult && musixmatchResult.synced) {
+      console.log('[Background] Replacing LRCLIB lyrics with Musixmatch synced lyrics');
+
+      // Save to cache for future use
+      if (successfulStrategy) {
+        this.saveSyncedLyricsToCache(
+          successfulStrategy.query,
+          musixmatchResult.synced,
+          'Musixmatch',
+          {
+            trackName: successfulStrategy.songName || videoInfo.title,
+            artistName: successfulStrategy.artistName || videoInfo.artist
+          }
+        );
+      }
+
+      this.currentProvider = 'Musixmatch';
+      this.processProviderResults(
+        musixmatchResult,
+        videoInfo,
+        successfulStrategy ? successfulStrategy.songName : videoInfo.title,
+        successfulStrategy ? successfulStrategy.artistName : videoInfo.artist,
+        'Musixmatch'
+      );
+      return;
+    }
+
+    // Try Deezer as fallback
+    console.log('[Background/Deezer] Trying Deezer...');
+    let deezerResult = null;
+
+    for (const strategy of strategies) {
+      if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
+        continue;
+      }
+
+      try {
+        console.log(`[Background/Deezer] Trying strategy: ${strategy.name} with query: "${strategy.query}"`);
+        deezerResult = await this.deezer.getLrc(strategy.query);
+
+        if (deezerResult && deezerResult.synced) {
+          console.log(`[Background/Deezer] Found synced lyrics with strategy: ${strategy.name}`);
+          successfulStrategy = strategy;
+          break;
+        }
+      } catch (error) {
+        console.log(`[Background/Deezer] Strategy ${strategy.name} failed:`, error.message);
+        continue;
+      }
+    }
+
+    // If Deezer found synced lyrics, replace current lyrics and cache
+    if (deezerResult && deezerResult.synced) {
+      console.log('[Background] Replacing LRCLIB lyrics with Deezer synced lyrics');
+
+      // Save to cache for future use
+      if (successfulStrategy) {
+        this.saveSyncedLyricsToCache(
+          successfulStrategy.query,
+          deezerResult.synced,
+          'Deezer',
+          {
+            trackName: successfulStrategy.songName || videoInfo.title,
+            artistName: successfulStrategy.artistName || videoInfo.artist
+          }
+        );
+      }
+
+      this.currentProvider = 'Deezer';
+      this.processProviderResults(
+        deezerResult,
+        videoInfo,
+        successfulStrategy ? successfulStrategy.songName : videoInfo.title,
+        successfulStrategy ? successfulStrategy.artistName : videoInfo.artist,
+        'Deezer'
+      );
+      return;
+    }
+
+    console.log('[Background] No synced lyrics found from providers, keeping LRCLIB lyrics');
+  }
+
+  /**
+   * Load from alternative providers when LRCLIB fails
+   */
+  async loadFromAlternativeProviders(videoInfo, strategies) {
+    // Try Musixmatch
+    let musixmatchResult = null;
+    let musixmatchRateLimited = false;
+    let successfulStrategy = null;
+
+    for (const strategy of strategies) {
+      if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
+        continue;
+      }
+
+      if (musixmatchRateLimited) {
+        break;
+      }
+
+      try {
+        console.log(`[Musixmatch] Trying strategy: ${strategy.name} with query: "${strategy.query}"`);
+        musixmatchResult = await this.musixmatch.getLrc(strategy.query);
+
+        if (musixmatchResult && musixmatchResult.synced) {
+          console.log(`[Musixmatch] Found lyrics with strategy: ${strategy.name}`);
+          successfulStrategy = strategy;
+          break;
+        }
+      } catch (error) {
+        console.log(`[Musixmatch] Strategy ${strategy.name} failed:`, error.message);
+        if (error.message.includes('token') || error.message.includes('401') || error.message.includes('rate') || error.message.includes('retries')) {
+          musixmatchRateLimited = true;
+        }
+        continue;
+      }
+    }
+
+    if (musixmatchResult && musixmatchResult.synced) {
+      // Save to cache for future use
+      if (successfulStrategy) {
+        this.saveSyncedLyricsToCache(
+          successfulStrategy.query,
+          musixmatchResult.synced,
+          'Musixmatch',
+          {
+            trackName: successfulStrategy.songName || videoInfo.title,
+            artistName: successfulStrategy.artistName || videoInfo.artist
+          }
+        );
+      }
+
+      this.currentProvider = 'Musixmatch';
+      this.processProviderResults(
+        musixmatchResult,
+        videoInfo,
+        successfulStrategy ? successfulStrategy.songName : videoInfo.title,
+        successfulStrategy ? successfulStrategy.artistName : videoInfo.artist,
+        'Musixmatch'
+      );
+      return;
+    }
+
+    // Try Deezer
+    let deezerResult = null;
+
+    for (const strategy of strategies) {
+      if (!strategy.enabled || !strategy.query || strategy.query.length < 2) {
+        continue;
+      }
+
+      try {
+        console.log(`[Deezer] Trying strategy: ${strategy.name} with query: "${strategy.query}"`);
+        deezerResult = await this.deezer.getLrc(strategy.query);
+
+        if (deezerResult && deezerResult.synced) {
+          console.log(`[Deezer] Found lyrics with strategy: ${strategy.name}`);
+          successfulStrategy = strategy;
+          break;
+        }
+      } catch (error) {
+        console.log(`[Deezer] Strategy ${strategy.name} failed:`, error.message);
+        continue;
+      }
+    }
+
+    if (deezerResult && deezerResult.synced) {
+      // Save to cache for future use
+      if (successfulStrategy) {
+        this.saveSyncedLyricsToCache(
+          successfulStrategy.query,
+          deezerResult.synced,
+          'Deezer',
+          {
+            trackName: successfulStrategy.songName || videoInfo.title,
+            artistName: successfulStrategy.artistName || videoInfo.artist
+          }
+        );
+      }
+
+      this.currentProvider = 'Deezer';
+      this.processProviderResults(
+        deezerResult,
+        videoInfo,
+        successfulStrategy ? successfulStrategy.songName : videoInfo.title,
+        successfulStrategy ? successfulStrategy.artistName : videoInfo.artist,
+        'Deezer'
+      );
+      return;
+    }
+
+    this.ui.showError('No lyrics found for this song');
   }
 
   /**
