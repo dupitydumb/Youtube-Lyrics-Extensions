@@ -48,7 +48,11 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+
+  /* Beautiful Lyrics container queries for responsive sizing */
+  container-type: inline-size;
 }
+
 
 /* Album cover styling */
 #panel-album-cover {
@@ -306,7 +310,27 @@
   min-height: 280px;
   max-height: 400px;
   position: relative;
+
+  /* Beautiful Lyrics gradient mask for fade effect at edges */
+  -webkit-mask-image: linear-gradient(180deg,
+      transparent 0,
+      transparent 16px,
+      #fff 32px,
+      #fff calc(100% - 64px),
+      transparent calc(100% - 16px),
+      transparent);
+  mask-image: linear-gradient(180deg,
+      transparent 0,
+      transparent 16px,
+      #fff 32px,
+      #fff calc(100% - 64px),
+      transparent calc(100% - 16px),
+      transparent);
+
+  /* Container queries support */
+  container-type: inline-size;
 }
+
 
 #lyrics-display::-webkit-scrollbar {
   display: none;
@@ -1190,4 +1214,364 @@
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* ==================== BEAUTIFUL LYRICS PATTERNS ==================== */
+
+/* Hover-reveal controls pattern */
+.lyrics-controls-hover {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+#lyrics-panel:hover .lyrics-controls-hover,
+#Lyric-Panel-Container:hover .lyrics-controls-hover {
+  opacity: 1;
+}
+
+/* LyricsScrollContainer styling (new component system) */
+.LyricsScrollContainer {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  /* Gradient mask for fade effect at edges */
+  -webkit-mask-image: linear-gradient(180deg,
+      transparent 0,
+      transparent 16px,
+      #fff 32px,
+      #fff calc(100% - 64px),
+      transparent calc(100% - 16px),
+      transparent);
+  mask-image: linear-gradient(180deg,
+      transparent 0,
+      transparent 16px,
+      #fff 32px,
+      #fff calc(100% - 64px),
+      transparent calc(100% - 16px),
+      transparent);
+}
+
+.LyricsScrollContainer::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* VocalsGroup styling (new component system) */
+.VocalsGroup {
+  position: relative;
+  padding: 0.75rem 1rem;
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  text-align: left;
+  white-space: normal;
+  word-wrap: break-word;
+  border-radius: 8px;
+  transition:
+    color 0.3s ease,
+    font-weight 0.3s ease,
+    opacity 0.3s ease,
+    text-shadow 0.3s ease;
+  background: transparent;
+  border: none;
+  width: 100%;
+}
+
+.VocalsGroup:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Enhanced word highlighting with Beautiful Lyrics styling */
+.lyric-word {
+  display: inline;
+  position: relative;
+  transition:
+    color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    text-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lyric-word.highlighted {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+}
+
+.lyric-word.past {
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-weight: 500 !important;
+}
+
+.lyric-word.future {
+  color: rgba(255, 255, 255, 0.35) !important;
+  font-weight: 400 !important;
+}
+
+/* Container query responsive sizing */
+@container (max-width: 400px) {
+
+  .lyric-line,
+  .VocalsGroup {
+    font-size: 1rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .lyric-line.lyric-current {
+    font-size: 1.15rem;
+  }
+}
+
+@container (min-width: 600px) {
+
+  .lyric-line,
+  .VocalsGroup {
+    font-size: 1.5rem;
+    line-height: 2.5rem;
+  }
+
+  .lyric-line.lyric-current {
+    font-size: 1.65rem;
+  }
+}
+
+/* Static lyrics styling */
+.static-lyrics-text {
+  white-space: pre-wrap;
+  line-height: 2;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.9);
+  padding: 1.5rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Interlude visual (Beautiful Lyrics pattern) */
+.interlude-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.interlude-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.interlude-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  animation: interlude-bounce 1.4s infinite ease-in-out both;
+}
+
+.interlude-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.interlude-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.interlude-dot:nth-child(3) {
+  animation-delay: 0s;
+}
+
+@keyframes interlude-bounce {
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ==================== SYLLABLE KARAOKE MODE ==================== */
+
+/* Syllable container for karaoke mode */
+.syllable-mode {
+  /* Syllable mode uses inline word spans with progressive fill */
+  font-feature-settings: "kern" 1;
+  letter-spacing: 0;
+}
+
+
+.syllable-container {
+  display: inline;
+}
+
+.syllable {
+  display: inline;
+  position: relative;
+  transition: all 0.1s ease;
+}
+
+/* Syllable inner span for karaoke effect */
+.syllable-inner {
+  display: inline;
+  position: relative;
+}
+
+/* Karaoke progressive fill effect using CSS custom properties */
+.syllable.active.syllable-karaoke .syllable-inner {
+  background: linear-gradient(to right,
+      #ffffff 0%,
+      #ffffff var(--sung-percent, 0%),
+      rgba(255, 255, 255, 0.4) var(--sung-percent, 0%),
+      rgba(255, 255, 255, 0.4) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+
+.syllable.past .syllable-inner {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.syllable.future .syllable-inner {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+
+/* ==================== BACKGROUND VOCALS ==================== */
+
+.background-vocal {
+  display: block;
+  font-style: italic;
+  font-size: 0.85em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 0.25rem;
+  padding-left: 1rem;
+  transition:
+    color 0.3s ease,
+    opacity 0.3s ease;
+}
+
+.background-vocal::before {
+  content: "(";
+}
+
+.background-vocal::after {
+  content: ")";
+}
+
+.background-vocal.opposite-aligned {
+  text-align: right;
+  padding-left: 0;
+  padding-right: 1rem;
+}
+
+/* Background vocal states */
+.background-vocal.lyric-current {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.background-vocal.lyric-past {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.background-vocal.lyric-future {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ==================== INTERLUDE STATE STYLING ==================== */
+
+.interlude-visual.interlude-waiting {
+  opacity: 0.3;
+}
+
+.interlude-visual.interlude-active {
+  opacity: 1;
+}
+
+.interlude-visual.interlude-active .interlude-dot {
+  animation-play-state: running;
+}
+
+.interlude-visual.interlude-complete {
+  opacity: 0.3;
+}
+
+.interlude-visual.interlude-complete .interlude-dot {
+  animation-play-state: paused;
+}
+
+/* Interlude progress bar */
+.interlude-progress {
+  width: 60%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.interlude-progress-fill {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 1px;
+  transition: width 0.1s linear;
+}
+
+/* Interlude duration label */
+.interlude-duration {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 8px;
+}
+
+/* ==================== WORD PULSE ANIMATION ==================== */
+
+@keyframes word-pulse {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ==================== SYLLABLE PULSE ANIMATION ==================== */
+
+@keyframes syllable-glow {
+  0% {
+    text-shadow: 0 0 0 transparent;
+  }
+
+  50% {
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+  }
+
+  100% {
+    text-shadow: 0 0 0 transparent;
+  }
+}
+
+.syllable.active {
+  animation: syllable-glow 0.3s ease-out;
 }

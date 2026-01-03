@@ -14,6 +14,10 @@ export class LyricsSync {
     this.videoElement = null;
     this.updateCallback = null;
     this.animationFrameId = null;
+
+    // Delta time tracking for smooth animations (Beautiful Lyrics pattern)
+    this._lastFrameTime = null;
+    this._lastVideoTime = null;
   }
 
   /**
@@ -64,10 +68,10 @@ export class LyricsSync {
     if (this.lastKnownIndex >= 0 && this.lastKnownIndex < this.syncedLyrics.length) {
       const lyric = this.syncedLyrics[this.lastKnownIndex];
       const nextLyric = this.syncedLyrics[this.lastKnownIndex + 1];
-      
+
       // Check if still in range of current lyric
-      if (lyric.time <= adjustedTime && 
-          (!nextLyric || nextLyric.time > adjustedTime)) {
+      if (lyric.time <= adjustedTime &&
+        (!nextLyric || nextLyric.time > adjustedTime)) {
         return { lyric, index: this.lastKnownIndex };
       }
     }
@@ -125,7 +129,7 @@ export class LyricsSync {
   getLyricContext(currentIndex, beforeCount = 3, afterCount = 3) {
     const start = Math.max(0, currentIndex - beforeCount);
     const end = Math.min(this.syncedLyrics.length, currentIndex + afterCount + 1);
-    
+
     return {
       lyrics: this.syncedLyrics.slice(start, end),
       startIndex: start,
@@ -147,36 +151,52 @@ export class LyricsSync {
 
   /**
    * Main sync loop using requestAnimationFrame for smooth updates
+   * Now includes delta time calculation for smooth animations (Beautiful Lyrics pattern)
    */
   syncLoop() {
     if (!this.isPlaying) {
       return;
     }
 
+    // Calculate delta time for smooth animations
+    const now = performance.now();
+    const deltaTime = this._lastFrameTime
+      ? (now - this._lastFrameTime) / 1000
+      : 1 / 60; // Default to 60fps on first frame
+    this._lastFrameTime = now;
+
     const currentTime = this.videoElement.currentTime;
+
+    // Detect if playback was skipped (seek)
+    const skipped = this._lastVideoTime !== null
+      && Math.abs(currentTime - this._lastVideoTime) > 1.0;
+    this._lastVideoTime = currentTime;
+
     const result = this.findCurrentLyric(currentTime);
 
     if (result) {
       const { lyric, index } = result;
       const indexChanged = index !== this.currentIndex;
-      
+
       // Trigger callback - pass indexChanged flag to optimize updates
       if (this.updateCallback) {
         // Only get previous/next on index change for performance
         const previous = indexChanged ? this.getPreviousLyric(index) : null;
         const next = indexChanged ? this.getNextLyric(index) : null;
-        
+
         this.updateCallback({
           current: lyric,
           currentIndex: index,
           currentTime: currentTime,
+          deltaTime: deltaTime,      // NEW: Time since last frame in seconds
+          skipped: skipped,          // NEW: Whether playback was skipped/seeked
           previous,
           next,
           totalCount: this.syncedLyrics.length,
           progress: (index / this.syncedLyrics.length) * 100,
           indexChanged: indexChanged
         });
-        
+
         this.currentIndex = index;
       }
     }
@@ -235,5 +255,7 @@ export class LyricsSync {
     this.syncedLyrics = [];
     this.currentIndex = -1;
     this.lastKnownIndex = 0;
+    this._lastFrameTime = null;
+    this._lastVideoTime = null;
   }
 }

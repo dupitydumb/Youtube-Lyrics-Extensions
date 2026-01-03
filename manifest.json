@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Youtube Lyrics",
-  "version": "2.0.3",
-  "description": "A Chrome extension that displays synchronized lyrics for YouTube videos with a beautiful, modern interface.",
+  "version": "2.1.0",
+  "description": "A Chrome extension that displays synchronized lyrics for YouTube videos with a beautiful, modern interface featuring Beautiful Lyrics-inspired components.",
   "permissions": [
     "activeTab",
     "storage"
@@ -59,7 +59,19 @@
         "modules/main.js",
         "modules/romanization.js",
         "modules/AlternativeProvider/musicmatch.js",
-        "modules/AlternativeProvider/deezer.js"
+        "modules/AlternativeProvider/deezer.js",
+        "modules/utils/Maid.js",
+        "modules/utils/Signal.js",
+        "modules/utils/index.js",
+        "modules/lyrics/LyricsRenderer.js",
+        "modules/lyrics/LyricsScroller.js",
+        "modules/lyrics/index.js",
+        "modules/lyrics/components/StaticLyrics.js",
+        "modules/lyrics/components/LineLyrics.js",
+        "modules/lyrics/components/WordLyrics.js",
+        "modules/lyrics/components/SyllableLyrics.js",
+        "modules/lyrics/components/Interlude.js",
+        "modules/lyrics/components/BackgroundVocals.js"
       ],
       "matches": [
         "*://*.youtube.com/*"

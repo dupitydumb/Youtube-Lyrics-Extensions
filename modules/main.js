@@ -14,6 +14,8 @@ import { FILTER_WORDS } from './constants.js';
 import { Romanizer } from './romanization.js';
 import { Musixmatch } from './AlternativeProvider/musicmatch.js';
 import { Deezer } from './AlternativeProvider/deezer.js';
+// Beautiful Lyrics-inspired components
+import { LyricsRenderer } from './lyrics/LyricsRenderer.js';
 
 class YouTubeLyricsApp {
   constructor() {
@@ -111,12 +113,14 @@ class YouTubeLyricsApp {
     this.currentLyrics = null;
     this.albumArtUrl = null;
     this.currentProvider = null; // Track which provider supplied the lyrics
+    this.lyricsRenderer = null; // Beautiful Lyrics-style renderer instance
 
     // Synced lyrics cache configuration
     this.SYNCED_CACHE_KEY = 'syncedLyricsCache';
     this.SYNCED_CACHE_MAX_SIZE = 100; // Maximum number of cached songs
     this.SYNCED_CACHE_EXPIRY = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
   }
+
 
   /**
    * Get cached synced lyrics for a query
@@ -339,6 +343,12 @@ class YouTubeLyricsApp {
   setupEventHandlers() {
     // Sync events
     this.sync.onUpdate((data) => {
+      // Animate LyricsRenderer if available (Beautiful Lyrics mode)
+      if (this.lyricsRenderer) {
+        this.lyricsRenderer.Animate(data.currentTime, data.deltaTime || 1 / 60, data.skipped);
+      }
+
+      // Also update legacy UI for backward compatibility
       this.ui.updateCurrentLyric(data.currentIndex, data.currentTime, data.indexChanged);
 
       // Update progress bar
@@ -351,6 +361,7 @@ class YouTubeLyricsApp {
         this.fullscreen.updateCurrentLyric(data.currentIndex, data.currentTime, data.indexChanged);
       }
     });
+
 
     // Fullscreen exit handler
     this.fullscreen.onExit(() => {
@@ -926,8 +937,12 @@ class YouTubeLyricsApp {
       }
     }
 
-    // Display lyrics
+    // Display lyrics using legacy UI
     this.ui.displaySyncedLyrics(this.currentLyrics);
+
+    // Create Beautiful Lyrics-style renderer (in addition to legacy UI)
+    // This enables advanced features like interludes and syllable sync
+    this._createLyricsRenderer(this.currentLyrics);
 
     // Apply stored font size
     const storedFontSize = this.settings.get('fontSize');
@@ -944,6 +959,7 @@ class YouTubeLyricsApp {
       this.sync.initialize(videoElement, syncedLyrics, this.settings.get('syncDelay'));
       this.sync.start();
     }
+
 
     // Load album art and update background
     this.albumArtUrl = await this.youtube.extractAlbumArt();
@@ -1130,6 +1146,50 @@ class YouTubeLyricsApp {
   }
 
   /**
+   * Create Beautiful Lyrics-style renderer for the current lyrics
+   * @param {Array} lyricsData - Synced lyrics array
+   */
+  _createLyricsRenderer(lyricsData) {
+    // Destroy any existing renderer
+    if (this.lyricsRenderer) {
+      this.lyricsRenderer.Destroy();
+      this.lyricsRenderer = null;
+    }
+
+    // We need a container to render into
+    // The renderer creates its own scroll container, so we use the panel
+    const lyricsContainer = this.ui.lyricsContainer;
+    if (!lyricsContainer) {
+      console.log('[LyricsRenderer] No container available, skipping renderer creation');
+      return;
+    }
+
+    try {
+      this.lyricsRenderer = new LyricsRenderer(lyricsContainer, lyricsData, {
+        highlightMode: this.highlightMode || 'line',
+        showRomanization: this.settings.get('showRomanization') === true,
+        hideOriginalLyrics: this.settings.get('hideOriginalLyrics') === true,
+        detectInterludes: true,
+        interludeThreshold: 5
+      });
+
+      // Connect seek signal to video element
+      this.lyricsRenderer.OnSeekRequest.Connect((time, index) => {
+        const videoElement = this.youtube.getVideoElement();
+        if (videoElement) {
+          videoElement.currentTime = time;
+          console.log(`[LyricsRenderer] Seeking to ${time}s (lyric index ${index})`);
+        }
+      });
+
+      console.log('[LyricsRenderer] Successfully created Beautiful Lyrics renderer');
+    } catch (error) {
+      console.log('[LyricsRenderer] Error creating renderer:', error.message);
+      this.lyricsRenderer = null;
+    }
+  }
+
+  /**
    * Handle navigate away from video
    */
   handleNavigateAway() {
@@ -1143,6 +1203,12 @@ class YouTubeLyricsApp {
     // Stop sync
     if (this.sync) {
       this.sync.stop();
+    }
+
+    // Destroy LyricsRenderer (Beautiful Lyrics)
+    if (this.lyricsRenderer) {
+      try { this.lyricsRenderer.Destroy(); } catch (e) { /* ignore */ }
+      this.lyricsRenderer = null;
     }
 
     // Destroy background elements to avoid leaking DOM/style nodes
@@ -1172,6 +1238,7 @@ class YouTubeLyricsApp {
     }
   }
 }
+
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
