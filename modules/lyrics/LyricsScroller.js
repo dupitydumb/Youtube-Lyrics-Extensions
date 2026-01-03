@@ -1,8 +1,8 @@
 /**
  * LyricsScroller - Dedicated scroll management for lyrics display
  * 
- * Handles smooth scrolling with easing, force-to-active on seek,
- * lyrics-ended detection, and jitter prevention.
+ * Uses CSS transform (translateY) instead of scrollTop for smoother,
+ * jitter-free animations. GPU-accelerated movement.
  * 
  * Inspired by Beautiful Lyrics' LyricsScroller pattern.
  */
@@ -25,10 +25,11 @@ export class LyricsScroller {
 
         // State
         this._activeIndex = -1;
-        this._isScrolling = false;
-        this._scrollAnimationId = null;
+        this._isAnimating = false;
+        this._animationId = null;
         this._lyricsEnded = false;
-        this._lastScrollTime = 0;
+        this._currentTranslateY = 0;
+        this._targetTranslateY = 0;
         this._userScrolled = false;
         this._userScrollTimeout = null;
 
@@ -36,8 +37,25 @@ export class LyricsScroller {
         this.OnActiveChanged = this._maid.Give(new Signal());
         this.OnScrollComplete = this._maid.Give(new Signal());
 
-        // Setup scroll detection to know when user manually scrolls
+        // Setup transform-based movement
+        this._setupTransformMovement();
+        
+        // Setup user interaction detection
         this._setupScrollDetection();
+    }
+
+    /**
+     * Setup the lyrics container for transform-based movement
+     */
+    _setupTransformMovement() {
+        if (!this._lyricsContainer) return;
+        
+        // Enable GPU acceleration
+        Object.assign(this._lyricsContainer.style, {
+            willChange: 'transform',
+            transform: 'translateY(0px)',
+            transition: 'none' // We'll animate manually for more control
+        });
     }
 
     /**
@@ -67,29 +85,29 @@ export class LyricsScroller {
     }
 
     /**
-     * Set the active vocal group and scroll to it
+     * Set the active vocal group and move lyrics to center it
      * @param {number} index - Index of the active vocal group
-     * @param {boolean} [instant=false] - Whether to scroll instantly
+     * @param {boolean} [instant=false] - Whether to move instantly
      */
     SetActive(index, instant = false) {
         if (index === this._activeIndex) return;
         if (index < 0 || index >= this._vocalGroups.length) return;
-        if (this._userScrolled) return; // Don't auto-scroll if user is scrolling
+        if (this._userScrolled) return; // Don't auto-move if user is scrolling
 
         const previousIndex = this._activeIndex;
         this._activeIndex = index;
 
-        // Scroll the active line into view
+        // Move lyrics to center the active line
         const group = this._vocalGroups[index];
         if (group && group.GroupContainer) {
-            this._scrollToElement(group.GroupContainer, instant);
+            this._moveToElement(group.GroupContainer, instant);
         }
 
         this.OnActiveChanged.Fire(index, previousIndex);
     }
 
     /**
-     * Force scroll to active line (used after seek)
+     * Force move to active line (used after seek)
      * @param {boolean} [skippedByVocal=false] - Whether the skip was initiated by clicking a lyric
      */
     ForceToActive(skippedByVocal = false) {
@@ -98,8 +116,8 @@ export class LyricsScroller {
         if (this._activeIndex >= 0 && this._activeIndex < this._vocalGroups.length) {
             const group = this._vocalGroups[this._activeIndex];
             if (group && group.GroupContainer) {
-                // Use instant scroll when user clicked a lyric
-                this._scrollToElement(group.GroupContainer, skippedByVocal);
+                // Use instant move when user clicked a lyric
+                this._moveToElement(group.GroupContainer, skippedByVocal);
             }
         }
     }
@@ -113,76 +131,81 @@ export class LyricsScroller {
     }
 
     /**
-     * Scroll to an element with smooth animation
-     * @param {HTMLElement} element - Element to scroll to
-     * @param {boolean} [instant=false] - Whether to scroll instantly
+     * Move lyrics container using CSS transform to center element
+     * @param {HTMLElement} element - Element to center
+     * @param {boolean} [instant=false] - Whether to move instantly
      */
-    _scrollToElement(element, instant = false) {
-        if (!this._scrollContainer || !element) return;
+    _moveToElement(element, instant = false) {
+        if (!this._scrollContainer || !this._lyricsContainer || !element) return;
 
-        // Prevent jitter - don't start new scroll if already scrolling
-        if (this._isScrolling && !instant) return;
+        // Don't interrupt animation unless instant
+        if (this._isAnimating && !instant) return;
 
         const containerRect = this._scrollContainer.getBoundingClientRect();
-        const elementRect = element.getBoundingClientRect();
-
-        // Calculate target position to center the element
         const containerHeight = containerRect.height;
+        
+        // Get element position relative to lyrics container
         const elementTop = element.offsetTop;
         const elementHeight = element.offsetHeight;
 
-        const targetScrollTop = elementTop - (containerHeight / 2) + (elementHeight / 2);
+        // Calculate target translateY to center the element
+        // We want the element to be at the vertical center of the container
+        const targetTranslateY = -(elementTop - (containerHeight / 2) + (elementHeight / 2));
 
         if (instant) {
-            this._scrollContainer.scrollTop = targetScrollTop;
+            this._currentTranslateY = targetTranslateY;
+            this._targetTranslateY = targetTranslateY;
+            this._lyricsContainer.style.transform = `translateY(${targetTranslateY}px)`;
             return;
         }
 
-        this._smoothScrollTo(targetScrollTop);
+        this._targetTranslateY = targetTranslateY;
+        this._animateTransform();
     }
 
     /**
-     * Smooth scroll with easing
-     * @param {number} targetPosition - Target scroll position
-     * @param {number} [duration=350] - Animation duration in ms
+     * Animate transform with easing - GPU accelerated, no jitter
+     * @param {number} [duration=400] - Animation duration in ms
      */
-    _smoothScrollTo(targetPosition, duration = 350) {
-        if (!this._scrollContainer) return;
+    _animateTransform(duration = 400) {
+        if (!this._lyricsContainer) return;
 
-        const startPosition = this._scrollContainer.scrollTop;
+        const startPosition = this._currentTranslateY;
+        const targetPosition = this._targetTranslateY;
         const distance = targetPosition - startPosition;
 
         // Skip if already close enough
-        if (Math.abs(distance) < 5) return;
+        if (Math.abs(distance) < 2) return;
 
         // Cancel any existing animation
-        if (this._scrollAnimationId) {
-            cancelAnimationFrame(this._scrollAnimationId);
+        if (this._animationId) {
+            cancelAnimationFrame(this._animationId);
         }
 
-        this._isScrolling = true;
+        this._isAnimating = true;
         const startTime = performance.now();
 
         // Easing function - easeOutCubic for smooth deceleration
         const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
-        const animateScroll = (currentTime) => {
+        const animate = (currentTime) => {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
             const easeProgress = easeOutCubic(progress);
 
-            this._scrollContainer.scrollTop = startPosition + (distance * easeProgress);
+            this._currentTranslateY = startPosition + (distance * easeProgress);
+            this._lyricsContainer.style.transform = `translateY(${this._currentTranslateY}px)`;
 
             if (progress < 1) {
-                this._scrollAnimationId = requestAnimationFrame(animateScroll);
+                this._animationId = requestAnimationFrame(animate);
             } else {
-                this._isScrolling = false;
-                this._scrollAnimationId = null;
+                this._isAnimating = false;
+                this._animationId = null;
                 this.OnScrollComplete.Fire();
             }
         };
 
-        this._scrollAnimationId = requestAnimationFrame(animateScroll);
+        this._animationId = requestAnimationFrame(animate);
     }
 
     /**
@@ -202,19 +225,19 @@ export class LyricsScroller {
     }
 
     /**
-     * Get whether currently scrolling
+     * Get whether currently animating
      * @returns {boolean}
      */
     get IsScrolling() {
-        return this._isScrolling;
+        return this._isAnimating;
     }
 
     /**
      * Clean up resources
      */
     Destroy() {
-        if (this._scrollAnimationId) {
-            cancelAnimationFrame(this._scrollAnimationId);
+        if (this._animationId) {
+            cancelAnimationFrame(this._animationId);
         }
         if (this._userScrollTimeout) {
             clearTimeout(this._userScrollTimeout);

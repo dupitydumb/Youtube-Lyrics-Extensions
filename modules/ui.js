@@ -335,69 +335,77 @@ export class LyricsUI {
         height: 0 !important;
       }
       
-      /* Base line styles */
+      /* Base line styles - matching content.css */
       #lyrics-display .lyric-line {
         position: relative !important;
-        padding: 0.75rem 1rem !important;
-        font-size: 1.25rem !important;
-        font-weight: 500 !important;
-        line-height: 1.6 !important;
-        color: rgba(255, 255, 255, 0.45) !important;
+        padding: 0.6rem 1rem !important;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+        font-size: 1.75rem !important;
+        font-weight: 700 !important;
+        line-height: 1.3 !important;
+        letter-spacing: -0.02em !important;
+        color: rgba(255, 248, 230, 0.35) !important;
         text-align: left !important;
+        font-style: normal !important;
         border-radius: 8px !important;
-        transition: color 0.3s ease, font-weight 0.3s ease !important;
+        transition: color 0.4s ease, transform 0.4s ease, opacity 0.4s ease, text-align 0.3s ease, font-style 0.3s ease, font-size 0.3s ease !important;
         cursor: pointer !important;
       }
       
-      /* Past lines - dimmer */
+      /* Past lines - bright cream, left-aligned */
       #lyrics-display .lyric-line.lyric-past {
-        color: rgba(255, 255, 255, 0.35) !important;
-      }
-      
-      /* Current line - bold white */
-      #lyrics-display .lyric-line.lyric-current {
-        color: #ffffff !important;
+        color: rgba(255, 248, 230, 0.85) !important;
+        text-align: left !important;
+        font-style: normal !important;
         font-weight: 700 !important;
-        font-size: 1.35rem !important;
       }
       
-      /* Future lines */
+      /* Current line - bold cream, centered, italic, larger */
+      #lyrics-display .lyric-line.lyric-current {
+        color: #fff8e6 !important;
+        font-weight: 700 !important;
+      }
+      
+      /* Future lines - dimmer, left-aligned */
       #lyrics-display .lyric-line.lyric-future {
-        color: rgba(255, 255, 255, 0.5) !important;
+        color: rgba(255, 248, 230, 0.35) !important;
+        text-align: left !important;
+        font-style: normal !important;
+        font-weight: 700 !important;
       }
       
       /* Hover effect */
       #lyrics-display .lyric-line:hover {
-        color: rgba(255, 255, 255, 0.75) !important;
+        color: rgba(255, 248, 230, 0.75) !important;
       }
       #lyrics-display .lyric-line.lyric-current:hover {
-        color: #ffffff !important;
+        color: #fff8e6 !important;
       }
       
-      /* Word highlighting - Apple Music bold style */
+      /* Word highlighting - Apple Music style - inherit all properties */
       #lyrics-display .lyric-word {
         --word-progress: 0%;
-        --highlight-color: #ffffff;
-        --future-color: rgba(255, 255, 255, 0.35);
+        --highlight-color: #fff8e6;
+        --future-color: rgba(255, 248, 230, 0.35);
         display: inline;
         font-family: inherit !important;
-        font-weight: 700 !important;
+        font-size: inherit !important;
+        font-weight: inherit !important;
+        line-height: inherit !important;
+        letter-spacing: inherit !important;
+        font-style: inherit !important;
         color: transparent !important;
         background-clip: text !important;
         -webkit-background-clip: text !important;
-        transition: transform 0.15s ease;
       }
       #lyrics-display .lyric-word.highlighted {
         background-image: linear-gradient(to right, var(--highlight-color) 0%, var(--highlight-color) var(--word-progress), var(--future-color) var(--word-progress), var(--future-color) 100%) !important;
-        font-weight: 800 !important;
       }
       #lyrics-display .lyric-word.past {
         background-image: linear-gradient(to right, var(--highlight-color) 0%, var(--highlight-color) 100%) !important;
-        font-weight: 800 !important;
       }
       #lyrics-display .lyric-word.future {
         background-image: linear-gradient(to right, var(--future-color) 0%, var(--future-color) 100%) !important;
-        font-weight: 700 !important;
       }
       
       /* Title visibility */

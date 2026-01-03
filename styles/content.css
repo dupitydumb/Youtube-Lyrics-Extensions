@@ -347,58 +347,71 @@
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.02em;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 248, 230, 0.35);
   cursor: pointer;
   text-align: left;
   white-space: normal;
   word-wrap: break-word;
   border-radius: 8px;
+  font-style: normal;
   /* Smooth transitions for all state changes */
   transition:
     color 0.4s ease,
     transform 0.4s ease,
-    opacity 0.4s ease;
+    opacity 0.4s ease,
+    text-align 0.3s ease,
+    font-style 0.3s ease,
+    font-size 0.3s ease;
 }
 
 /* ==================== APPLE MUSIC LINE STATES ==================== */
 
-/* PAST LINES - Dimmer, already played */
+/* PAST LINES - Bright cream, left-aligned, already played */
 .lyric-line.lyric-past {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 248, 230, 0.85);
+  text-align: left;
   font-weight: 700;
 }
 
-/* CURRENT LINE - Bold white, prominent */
+/* CURRENT LINE - Bold cream, centered, italic, larger and prominent */
 .lyric-line.lyric-current {
-  color: #ffffff;
-  font-weight: 800;
-  font-size: 1.9rem;
+  color: #fff8e6;
+  text-align: center;
+  font-style: italic;
+  font-size: 2rem;
+  font-weight: 700;
 }
 
-/* FUTURE LINES - More faded, waiting to be sung */
+/* FUTURE LINES - Dimmer, left-aligned, waiting to be sung */
 .lyric-line.lyric-future {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 248, 230, 0.35);
+  text-align: left;
+  font-style: normal;
   font-weight: 700;
 }
 
 /* Legacy classes for backwards compatibility */
 .lyric-line.lyric-prev {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 248, 230, 0.85);
+  text-align: left;
+  font-style: normal;
   font-weight: 700;
 }
 
 .lyric-line.lyric-next {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 248, 230, 0.35);
+  text-align: left;
+  font-style: normal;
   font-weight: 700;
 }
 
 /* ==================== HOVER STATES ==================== */
 .lyric-line:hover {
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 248, 230, 0.75);
 }
 
 .lyric-line.lyric-current:hover {
-  color: #ffffff;
+  color: #fff8e6;
 }
 
 /* ==================== LOADING & ERROR STATES ==================== */
@@ -1077,29 +1090,30 @@
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.02em;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 248, 230, 0.35);
   cursor: pointer;
   text-align: left;
-  transition:
-    color 0.4s ease,
-    transform 0.4s ease,
-    opacity 0.4s ease;
+  font-style: normal;
+  transition: color 0.4s ease, text-align 0.3s ease, font-style 0.3s ease;
 }
 
 #fullscreen-lyrics-container .lyric-line.lyric-current,
 #fullscreen-lyrics-wrapper .lyric-line.lyric-current,
 #fullscreen-lyrics-container .VocalsGroup.lyric-current,
 #fullscreen-lyrics-wrapper .VocalsGroup.lyric-current {
-  color: #ffffff;
-  font-weight: 800;
-  font-size: 2.75rem;
+  color: #fff8e6;
+  text-align: left;
+  font-style: italic;
+  font-weight: 700;
 }
 
 #fullscreen-lyrics-container .lyric-line.lyric-past,
 #fullscreen-lyrics-wrapper .lyric-line.lyric-past,
 #fullscreen-lyrics-container .VocalsGroup.lyric-past,
 #fullscreen-lyrics-wrapper .VocalsGroup.lyric-past {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 248, 230, 0.85);
+  text-align: left;
+  font-style: normal;
   font-weight: 700;
 }
 
@@ -1107,41 +1121,61 @@
 #fullscreen-lyrics-wrapper .lyric-line.lyric-future,
 #fullscreen-lyrics-container .VocalsGroup.lyric-future,
 #fullscreen-lyrics-wrapper .VocalsGroup.lyric-future {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 248, 230, 0.35);
+  text-align: left;
+  font-style: normal;
   font-weight: 700;
 }
 
-/* Fullscreen word highlighting - Apple Music bold style */
+/* Fullscreen word highlighting - Apple Music style - inherit all from parent */
 #fullscreen-lyrics-container .lyric-word,
 #fullscreen-lyrics-wrapper .lyric-word {
   --word-progress: 0%;
-  --highlight-color: #ffffff;
-  --future-color: rgba(255, 255, 255, 0.35);
+  --highlight-color: #fff8e6;
+  --future-color: rgba(255, 248, 230, 0.35);
   display: inline;
   font-family: inherit !important;
-  font-weight: 700 !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
+  letter-spacing: inherit !important;
+  font-style: inherit !important;
   color: transparent !important;
   background-clip: text !important;
   -webkit-background-clip: text !important;
-  transition: transform 0.15s ease, text-shadow 0.15s ease;
 }
 
 #fullscreen-lyrics-container .lyric-word.highlighted,
 #fullscreen-lyrics-wrapper .lyric-word.highlighted {
   background-image: linear-gradient(to right, var(--highlight-color) 0%, var(--highlight-color) var(--word-progress), var(--future-color) var(--word-progress), var(--future-color) 100%) !important;
-  font-weight: 800 !important;
 }
 
 #fullscreen-lyrics-container .lyric-word.past,
 #fullscreen-lyrics-wrapper .lyric-word.past {
   background-image: linear-gradient(to right, var(--highlight-color) 0%, var(--highlight-color) 100%) !important;
-  font-weight: 800 !important;
 }
 
 #fullscreen-lyrics-container .lyric-word.future,
 #fullscreen-lyrics-wrapper .lyric-word.future {
   background-image: linear-gradient(to right, var(--future-color) 0%, var(--future-color) 100%) !important;
-  font-weight: 700 !important;
+}
+
+/* Fullscreen lyrics text container */
+#fullscreen-lyrics-container .lyric-text,
+#fullscreen-lyrics-wrapper .lyric-text {
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
+}
+
+/* Romanization text in fullscreen - smaller */
+#fullscreen-lyrics-container .romanization-text,
+#fullscreen-lyrics-wrapper .romanization-text {
+  font-size: 1.25rem !important;
+  font-weight: 500 !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-style: italic !important;
+  margin-top: 0.25rem !important;
 }
 
 .lyrics-fullscreen-overlay {
@@ -1178,31 +1212,40 @@
 .fullscreen-lyric-line {
   padding: 8px 0;
   font-size: 28px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.5;
   letter-spacing: -0.01em;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 248, 230, 0.35);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s ease, text-align 0.3s ease, font-style 0.3s ease, font-size 0.3s ease;
   text-align: left;
+  font-style: normal;
 }
 
 .fullscreen-lyric-line:hover {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 248, 230, 0.7);
 }
 
 .fullscreen-lyric-line.current {
-  color: #ffffff;
-  font-size: 32px;
+  color: #fff8e6;
+  font-size: 40px;
   font-weight: 700;
+  text-align: center;
+  font-style: italic;
 }
 
 .fullscreen-lyric-line.past {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 248, 230, 0.85);
+  text-align: left;
+  font-style: normal;
+  font-weight: 700;
 }
 
 .fullscreen-lyric-line.future {
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 248, 230, 0.35);
+  text-align: left;
+  font-style: normal;
+  font-weight: 700;
 }
 
 /* Exit hint */
@@ -1317,8 +1360,7 @@
 /* LyricsScrollContainer styling (new component system) */
 .LyricsScrollContainer {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden; /* Clip content, transform-based movement */
   position: relative;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -1346,6 +1388,11 @@
   height: 0;
 }
 
+/* Lyrics container moves via CSS transform */
+.LyricsScrollContainer .Lyrics {
+  will-change: transform;
+}
+
 /* VocalsGroup styling (new component system) */
 .VocalsGroup {
   position: relative;
@@ -1355,39 +1402,69 @@
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.02em;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 248, 230, 0.35);
   cursor: pointer;
   text-align: left;
   white-space: normal;
   word-wrap: break-word;
   border-radius: 8px;
+  font-style: normal;
   transition:
     color 0.4s ease,
     transform 0.4s ease,
-    opacity 0.4s ease;
+    opacity 0.4s ease,
+    text-align 0.3s ease,
+    font-style 0.3s ease,
+    font-size 0.3s ease;
   background: transparent;
   border: none;
   width: 100%;
 }
 
 .VocalsGroup:hover {
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 248, 230, 0.75);
+}
+
+/* VocalsGroup states - matching lyric-line */
+.VocalsGroup.lyric-past {
+  color: rgba(255, 248, 230, 0.85);
+  text-align: left;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.VocalsGroup.lyric-current {
+  color: #fff8e6;
+  text-align: center;
+  font-style: italic;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.VocalsGroup.lyric-future {
+  color: rgba(255, 248, 230, 0.35);
+  text-align: left;
+  font-style: normal;
+  font-weight: 700;
 }
 
 /* Enhanced word highlighting with Apple Music-style progressive fill */
 .lyric-word {
   --word-progress: 0%;
-  --highlight-color: #ffffff;
-  --future-color: rgba(255, 255, 255, 0.35);
+  --highlight-color: #fff8e6;
+  --future-color: rgba(255, 248, 230, 0.35);
   
   display: inline;
   position: relative;
   font-family: inherit;
-  font-weight: 700;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  font-style: inherit;
   color: transparent !important;
   background-clip: text !important;
   -webkit-background-clip: text !important;
-  transition: transform 0.15s ease;
 }
 
 .lyric-word.highlighted {
@@ -1399,7 +1476,6 @@
     var(--future-color) var(--word-progress),
     var(--future-color) 100%
   ) !important;
-  font-weight: 800 !important;
 }
 
 .lyric-word.past {
@@ -1409,7 +1485,6 @@
     var(--highlight-color) 0%,
     var(--highlight-color) 100%
   ) !important;
-  font-weight: 800 !important;
 }
 
 .lyric-word.future {
@@ -1419,7 +1494,6 @@
     var(--future-color) 0%,
     var(--future-color) 100%
   ) !important;
-  font-weight: 700 !important;
 }
 
 /* Container query responsive sizing */
@@ -1540,10 +1614,10 @@
 /* Karaoke progressive fill effect using CSS custom properties */
 .syllable.active.syllable-karaoke .syllable-inner {
   background: linear-gradient(to right,
-      #ffffff 0%,
-      #ffffff var(--sung-percent, 0%),
-      rgba(255, 255, 255, 0.4) var(--sung-percent, 0%),
-      rgba(255, 255, 255, 0.4) 100%);
+      #fff8e6 0%,
+      #fff8e6 var(--sung-percent, 0%),
+      rgba(255, 248, 230, 0.35) var(--sung-percent, 0%),
+      rgba(255, 248, 230, 0.35) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1551,12 +1625,12 @@
 }
 
 .syllable.past .syllable-inner {
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 248, 230, 0.85);
   font-weight: 700;
 }
 
 .syllable.future .syllable-inner {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 248, 230, 0.35);
   font-weight: 700;
 }
 
@@ -1566,7 +1640,7 @@
   display: block;
   font-style: italic;
   font-size: 0.85em;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 248, 230, 0.5);
   margin-top: 0.25rem;
   padding-left: 1rem;
   transition:
@@ -1590,15 +1664,15 @@
 
 /* Background vocal states */
 .background-vocal.lyric-current {
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 248, 230, 0.75);
 }
 
 .background-vocal.lyric-past {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 248, 230, 0.5);
 }
 
 .background-vocal.lyric-future {
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 248, 230, 0.3);
 }
 
 /* ==================== INTERLUDE STATE STYLING ==================== */

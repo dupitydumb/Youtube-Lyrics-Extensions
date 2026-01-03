@@ -97,14 +97,31 @@ export class FullscreenManager {
         -ms-overflow-style: none !important;
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
       }
-      #fullscreen-lyrics-wrapper {
-        min-height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
+      
+      /* LyricsRenderer scroll container inside fullscreen */
+      #fullscreen-lyrics-container .LyricsScrollContainer {
+        flex: 1;
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding: 0 20px;
+      }
+      #fullscreen-lyrics-container .LyricsScrollContainer::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
       }
       
-      /* Apple Music Fullscreen Typography */
+      /* Spacers for centering lyrics in fullscreen */
+      #fullscreen-lyrics-container .lyrics-spacer-top,
+      #fullscreen-lyrics-container .lyrics-spacer-bottom {
+        height: 40vh;
+        min-height: 40vh;
+      }
+      
+      /* Apple Music Fullscreen Typography - consistent font-weight to prevent jitter */
       #fullscreen-lyrics-container .lyric-line,
       #fullscreen-lyrics-container .VocalsGroup {
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
@@ -112,40 +129,55 @@ export class FullscreenManager {
         font-weight: 700 !important;
         line-height: 1.3 !important;
         letter-spacing: -0.02em !important;
-        color: rgba(255, 255, 255, 0.35) !important;
+        color: rgba(255, 248, 230, 0.35) !important;
         padding: 0.6rem 0 !important;
         text-align: left !important;
-        transition: color 0.4s ease, transform 0.4s ease, opacity 0.4s ease !important;
+        font-style: normal !important;
+        transition: color 0.4s ease, text-align 0.3s ease, font-style 0.3s ease !important;
       }
       
       #fullscreen-lyrics-container .lyric-line.lyric-current,
       #fullscreen-lyrics-container .VocalsGroup.lyric-current {
-        color: #ffffff !important;
-        font-weight: 800 !important;
-        font-size: 2.75rem !important;
+        color: #fff8e6 !important;
       }
       
       #fullscreen-lyrics-container .lyric-line.lyric-past,
       #fullscreen-lyrics-container .VocalsGroup.lyric-past {
-        color: rgba(255, 255, 255, 0.4) !important;
-        font-weight: 700 !important;
+        color: rgba(255, 248, 230, 0.85) !important;
+        text-align: left !important;
+        font-style: normal !important;
       }
       
       #fullscreen-lyrics-container .lyric-line.lyric-future,
       #fullscreen-lyrics-container .VocalsGroup.lyric-future {
-        color: rgba(255, 255, 255, 0.35) !important;
-        font-weight: 700 !important;
+        color: rgba(255, 248, 230, 0.35) !important;
+        text-align: left !important;
+        font-style: normal !important;
       }
       
-      /* Word highlighting for fullscreen */
+      /* Word highlighting for fullscreen - inherit size from parent */
       #fullscreen-lyrics-container .lyric-word {
         font-family: inherit !important;
-        font-weight: 700 !important;
+        font-size: inherit !important;
+        font-weight: inherit !important;
+        line-height: inherit !important;
+        letter-spacing: inherit !important;
+        font-style: inherit !important;
       }
       
-      #fullscreen-lyrics-container .lyric-word.highlighted,
-      #fullscreen-lyrics-container .lyric-word.past {
-        font-weight: 800 !important;
+      /* Lyrics text container */
+      #fullscreen-lyrics-container .lyric-text {
+        font-size: inherit !important;
+        font-weight: inherit !important;
+      }
+      
+      /* Romanization text in fullscreen */
+      #fullscreen-lyrics-container .romanization-text {
+        font-size: 1.25rem !important;
+        font-weight: 500 !important;
+        color: rgba(255, 255, 255, 0.6) !important;
+        font-style: italic !important;
+        margin-top: 0.25rem !important;
       }
     `;
     this.overlay.appendChild(style);
@@ -254,13 +286,14 @@ export class FullscreenManager {
       contentContainer.appendChild(leftPanel);
     }
 
-    // Right Panel: Lyrics
+    // Right Panel: Lyrics - set as flex container for LyricsRenderer
     this.lyricsContainer.style.cssText = `
       flex: 1;
       height: 100%;
-      overflow-y: scroll;
-      overflow-x: hidden;
-      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 0;
       box-sizing: border-box;
     `;
 
@@ -509,14 +542,12 @@ export class FullscreenManager {
    */
   _displayWithRenderer(lyrics) {
     try {
-      // Create wrapper for proper centering and scrolling
-      const wrapper = document.createElement('div');
-      wrapper.id = 'fullscreen-lyrics-wrapper';
-      wrapper.style.paddingTop = '40vh';
-      wrapper.style.paddingBottom = '40vh';
-      this.lyricsContainer.appendChild(wrapper);
-
-      this._lyricsRenderer = new LyricsRenderer(wrapper, lyrics, {
+      // Don't create extra wrapper - pass lyricsContainer directly
+      // LyricsRenderer creates its own scroll container
+      // Remove scroll from parent to prevent nested scrolling
+      this.lyricsContainer.style.overflow = 'hidden';
+      
+      this._lyricsRenderer = new LyricsRenderer(this.lyricsContainer, lyrics, {
         highlightMode: this.highlightMode,
         showRomanization: this.settings?.showRomanization || false,
         hideOriginalLyrics: this.settings?.hideOriginalLyrics || false,
@@ -547,6 +578,12 @@ export class FullscreenManager {
    * @private
    */
   _displayLegacy(lyrics) {
+    // Re-enable scrolling for legacy mode
+    this.lyricsContainer.style.overflow = 'auto';
+    this.lyricsContainer.style.overflowY = 'scroll';
+    this.lyricsContainer.style.overflowX = 'hidden';
+    this.lyricsContainer.style.padding = '40px 20px';
+    
     // Create wrapper for proper centering and scrolling
     const wrapper = document.createElement('div');
     wrapper.id = 'fullscreen-lyrics-wrapper';
@@ -560,15 +597,16 @@ export class FullscreenManager {
       lyricLine.dataset.index = index;
       lyricLine.dataset.time = lyric.time;
 
-      // Apple Music style - simple, clean, left-aligned
+      // Apple Music style - simple, clean, left-aligned for future lines
       Object.assign(lyricLine.style, {
         padding: '12px 0',
         fontSize: '28px',
         lineHeight: '1.5',
-        color: 'rgba(255, 255, 255, 0.45)',
-        transition: 'all 0.3s ease',
-        fontWeight: '600',
+        color: 'rgba(255, 248, 230, 0.35)',
+        transition: 'all 0.3s ease, text-align 0.3s ease, font-style 0.3s ease',
+        fontWeight: '700',
         textAlign: 'left',
+        fontStyle: 'normal',
         cursor: 'pointer',
         letterSpacing: '-0.01em'
       });
@@ -717,29 +755,30 @@ export class FullscreenManager {
             line.classList.add('current');
             line.classList.remove('past', 'future');
 
-            // Apple Music style - bold white, no blur, no glow
+            // Apple Music style - bold cream, centered, italic, LARGER
             Object.assign(line.style, {
-              color: '#ffffff',
-              fontSize: '32px',
+              color: '#fff8e6',
+              fontSize: '40px',
               fontWeight: '700',
-              textAlign: 'left',
-              transition: 'all 0.3s ease',
+              textAlign: 'center',
+              fontStyle: 'italic',
+              transition: 'all 0.3s ease, text-align 0.3s ease, font-style 0.3s ease, font-size 0.3s ease',
               letterSpacing: '-0.01em'
             });
 
             // Force color override
             try {
-              line.style.setProperty('color', '#ffffff', 'important');
+              line.style.setProperty('color', '#fff8e6', 'important');
             } catch (e) { }
 
             // Ensure inner elements are fully visible
             const orig = line.querySelector('.fullscreen-original-text');
             if (orig) {
-              orig.style.color = '#ffffff';
+              orig.style.color = '#fff8e6';
             }
             const romanElems = line.querySelectorAll('.fullscreen-romanization, .word-romanization');
             romanElems.forEach(el => {
-              el.style.color = 'rgba(255, 255, 255, 0.9)';
+              el.style.color = 'rgba(255, 248, 230, 0.9)';
             });
             
             // Only set all words to white in LINE mode
@@ -751,7 +790,7 @@ export class FullscreenManager {
                 w.style.color = 'transparent';
                 w.style.backgroundClip = 'text';
                 w.style.webkitBackgroundClip = 'text';
-                w.style.backgroundImage = 'linear-gradient(to right, #ffffff 0%, #ffffff 100%)';
+                w.style.backgroundImage = 'linear-gradient(to right, #fff8e6 0%, #fff8e6 100%)';
                 w.style.fontWeight = '700';
                 w.style.setProperty('--word-progress', '100%');
               });
@@ -762,12 +801,12 @@ export class FullscreenManager {
               wordSpans.forEach(w => {
                 const wordState = w.dataset.state || 'future';
                 if (wordState === 'future') {
-                  const futureColor = 'rgba(255, 255, 255, 0.4)';
+                  const futureColor = 'rgba(255, 248, 230, 0.35)';
                   w.style.color = 'transparent';
                   w.style.backgroundClip = 'text';
                   w.style.webkitBackgroundClip = 'text';
                   w.style.backgroundImage = `linear-gradient(to right, ${futureColor} 0%, ${futureColor} 100%)`;
-                  w.style.fontWeight = '500';
+                  w.style.fontWeight = '700';
                   w.style.setProperty('--word-progress', '0%');
                 }
               });
@@ -799,15 +838,16 @@ export class FullscreenManager {
               line.classList.remove('past');
             }
 
-            // Apple Music style - dimmed text, no blur
-            const fadedColor = isPast ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.45)';
+            // Apple Music style - past lines bright cream, future lines dimmed
+            const fadedColor = isPast ? 'rgba(255, 248, 230, 0.85)' : 'rgba(255, 248, 230, 0.35)';
 
             Object.assign(line.style, {
               fontSize: '28px',
-              fontWeight: '600',
+              fontWeight: '700',
               color: fadedColor,
-              transition: 'all 0.3s ease',
+              transition: 'all 0.3s ease, text-align 0.3s ease, font-style 0.3s ease',
               textAlign: 'left',
+              fontStyle: 'normal',
               letterSpacing: '-0.01em'
             });
 
@@ -818,7 +858,7 @@ export class FullscreenManager {
             }
             const romanElems2 = line.querySelectorAll('.fullscreen-romanization, .word-romanization');
             romanElems2.forEach(el => {
-              el.style.color = 'rgba(255,255,255,0.5)';
+              el.style.color = 'rgba(255, 248, 230, 0.5)';
             });
             const wordSpans2 = line.querySelectorAll('.lyric-word');
             wordSpans2.forEach(w => {
@@ -827,7 +867,7 @@ export class FullscreenManager {
               w.style.backgroundClip = 'text';
               w.style.webkitBackgroundClip = 'text';
               w.style.backgroundImage = `linear-gradient(to right, ${fadedColor} 0%, ${fadedColor} 100%)`;
-              w.style.fontWeight = '600';
+              w.style.fontWeight = '700';
               // Clear any word-level highlighting state
               w.classList.remove('highlighted', 'active');
               w.classList.add(isPast ? 'past' : 'future');
@@ -918,28 +958,28 @@ export class FullscreenManager {
             word.style.webkitBackgroundClip = 'text';
 
             if (newState === 'active') { // Active word - progressive fill
-              const highlightColor = '#ffffff';
-              const futureColor = 'rgba(255, 255, 255, 0.3)';
+              const highlightColor = '#fff8e6';
+              const futureColor = 'rgba(255, 248, 230, 0.35)';
               word.style.backgroundImage = `linear-gradient(to right, ${highlightColor} 0%, ${highlightColor} ${progress}%, ${futureColor} ${progress}%, ${futureColor} 100%)`;
-              word.style.textShadow = '0 0 20px rgba(255, 255, 255, 0.4)';
+              word.style.textShadow = '0 0 20px rgba(255, 248, 230, 0.4)';
               word.style.transform = 'scale(1.02) translateZ(0)';
               word.style.fontWeight = '700';
               word.style.filter = 'blur(0px)';
 
-            } else if (newState === 'past') { // Past word - fully filled but dimmed
-              const pastColor = 'rgba(255, 255, 255, 0.5)';
+            } else if (newState === 'past') { // Past word - fully filled, bright cream
+              const pastColor = 'rgba(255, 248, 230, 0.85)';
               word.style.backgroundImage = `linear-gradient(to right, ${pastColor} 0%, ${pastColor} 100%)`;
               word.style.textShadow = 'none';
               word.style.transform = 'scale(1) translateZ(0)';
-              word.style.fontWeight = '500';
+              word.style.fontWeight = '700';
               word.style.filter = 'blur(0px)';
 
-            } else { // Future word - no fill
-              const futureColor = 'rgba(255, 255, 255, 0.3)';
+            } else { // Future word - dimmed
+              const futureColor = 'rgba(255, 248, 230, 0.35)';
               word.style.backgroundImage = `linear-gradient(to right, ${futureColor} 0%, ${futureColor} 100%)`;
               word.style.textShadow = 'none';
               word.style.transform = 'scale(1) translateZ(0)';
-              word.style.fontWeight = '400';
+              word.style.fontWeight = '700';
               word.style.filter = 'blur(0px)';
             }
           }

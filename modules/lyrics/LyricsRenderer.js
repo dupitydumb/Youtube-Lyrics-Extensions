@@ -136,20 +136,18 @@ export class LyricsRenderer {
      * Create container elements
      */
     _createContainers() {
-        // Create scroll container
+        // Create viewport container (clips the moving lyrics)
         this._scrollContainer = this._maid.Give(document.createElement('div'));
         this._scrollContainer.className = 'LyricsScrollContainer';
         Object.assign(this._scrollContainer.style, {
             flex: '1',
-            overflowY: 'auto',
-            overflowX: 'hidden',
+            overflow: 'hidden', // Clip content, no scrolling
             position: 'relative',
-            scrollBehavior: 'smooth',
             scrollbarWidth: 'none',
             msOverflowStyle: 'none'
         });
 
-        // Create lyrics container
+        // Create lyrics container (moves via CSS transform)
         this._lyricsContainer = this._maid.Give(document.createElement('div'));
         this._lyricsContainer.className = 'Lyrics';
         this._lyricsContainer.id = 'lyrics-display';
@@ -157,7 +155,9 @@ export class LyricsRenderer {
             display: 'flex',
             flexDirection: 'column',
             gap: '0.25rem',
-            padding: '1rem 1.5rem'
+            padding: '1rem 1.5rem',
+            willChange: 'transform',
+            transform: 'translateY(0px)'
         });
 
         this._scrollContainer.appendChild(this._lyricsContainer);
