@@ -170,10 +170,14 @@ export class LyricsRenderer {
     _renderLyrics() {
         const { type, lines } = this._lyricsData;
 
-        // Add top spacer for scroll centering
+        // Add top spacer for scroll centering (50% of container = center the first line)
         const topSpacer = document.createElement('div');
-        topSpacer.style.height = '120px';
-        topSpacer.style.flexShrink = '0';
+        topSpacer.className = 'lyrics-spacer lyrics-spacer-top';
+        Object.assign(topSpacer.style, {
+            height: '50%',
+            minHeight: '120px',
+            flexShrink: '0'
+        });
         this._lyricsContainer.appendChild(topSpacer);
 
         if (type === 'static') {
@@ -182,12 +186,17 @@ export class LyricsRenderer {
             this._renderSyncedLyrics(lines, type);
         }
 
-        // Add bottom spacer
+        // Add bottom spacer (50% of container = center the last line)
         const bottomSpacer = document.createElement('div');
-        bottomSpacer.style.height = '120px';
-        bottomSpacer.style.flexShrink = '0';
+        bottomSpacer.className = 'lyrics-spacer lyrics-spacer-bottom';
+        Object.assign(bottomSpacer.style, {
+            height: '50%',
+            minHeight: '120px',
+            flexShrink: '0'
+        });
         this._lyricsContainer.appendChild(bottomSpacer);
     }
+
 
     /**
      * Render static (unsynced) lyrics

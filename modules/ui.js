@@ -515,7 +515,7 @@ export class LyricsUI {
 
     // Clear using replaceChildren for Trusted Types compatibility
     this.lyricsContainer.replaceChildren();
-    
+
     // Add padding spacers to allow first/last lyrics to scroll to center
     const topSpacer = document.createElement('div');
     topSpacer.style.height = '120px';
@@ -592,7 +592,7 @@ export class LyricsUI {
 
       this.lyricsContainer.appendChild(lyricLine);
     });
-    
+
     // Bottom spacer for scroll centering
     const bottomSpacer = document.createElement('div');
     bottomSpacer.style.height = '120px';
@@ -615,10 +615,10 @@ export class LyricsUI {
     const previousMode = this.highlightMode;
     this.highlightMode = mode;
     console.log(`[UI] Highlight mode changed: ${previousMode} -> ${mode}`);
-    
+
     // If we have cached lines and mode changed, refresh word highlighting
     if (this._cachedLines && previousMode !== mode) {
-      const currentLine = Array.from(this._cachedLines).find(line => 
+      const currentLine = Array.from(this._cachedLines).find(line =>
         line.classList.contains('lyric-current')
       );
       if (currentLine) {
@@ -674,7 +674,7 @@ export class LyricsUI {
 
     const lineIndex = parseInt(lineElement.dataset.index || '-1', 10);
     const lastIdx = this._lastWordIndexMap.get(lineIndex) ?? -1;
-    
+
     // Always update all words to ensure proper past/current/future state
     // This fixes the issue where future words stayed highlighted
     wordArray.forEach((word, idx) => {
@@ -686,7 +686,7 @@ export class LyricsUI {
         // Current word
         word.classList.add('highlighted');
         word.classList.remove('past', 'future');
-        
+
         // Add subtle pulse animation only when word changes
         if (lastIdx !== currentWordIndex) {
           word.style.animation = 'word-pulse 0.4s ease-out';
@@ -1354,23 +1354,12 @@ export class LyricsUI {
       color: #eee;
     `;
 
-    // Create menu items
+    // Create menu items - simplified settings
     const menuItems = [
       {
         type: 'button',
-        label: 'Show lyrics panel',
-        checked: true,
-        onClick: () => {
-          menuItems[0].checked = !menuItems[0].checked;
-          if (onTogglePanel) onTogglePanel();
-          // Update checkmark
-          const items = panel.querySelectorAll('div[data-menu-item]');
-          items[0].querySelector('div:last-child').style.opacity = menuItems[0].checked ? '1' : '0';
-        }
-      },
-      {
-        type: 'button',
         label: 'Fullscreen karaoke',
+        icon: '⛶',
         onClick: () => {
           panel.style.display = 'none';
           if (onFullscreen) onFullscreen();
@@ -1387,7 +1376,6 @@ export class LyricsUI {
         onChange: (value) => {
           if (settings?.onFontSizeChange) {
             settings.onFontSizeChange(value);
-            // Update stored settings
             if (this.settingsRef) this.settingsRef.fontSize = value;
           }
           return value + 'px';
@@ -1404,7 +1392,6 @@ export class LyricsUI {
         onChange: (value) => {
           if (settings?.onSyncDelayChange) {
             settings.onSyncDelayChange(value);
-            // Update stored settings
             if (this.settingsRef) this.settingsRef.syncDelay = value;
           }
           return value + 'ms';
@@ -1412,83 +1399,16 @@ export class LyricsUI {
       },
       { type: 'separator' },
       {
-        type: 'submenu',
-        label: 'Background',
-        currentValue: this.getBackgroundLabel(settings?.backgroundMode || 'album'),
-        options: [
-          { value: 'album', label: 'Album art' },
-          { value: 'gradient', label: 'Gradient' },
-          { value: 'video', label: 'Video thumbnail' },
-          { value: 'none', label: 'None' }
-        ],
-        selected: settings?.backgroundMode || 'album',
-        onChange: (value) => {
-          if (settings?.onBackgroundModeChange) settings.onBackgroundModeChange(value);
-        }
-      },
-      {
-        type: 'submenu',
+        type: 'toggle',
         label: 'Romanization',
-        currentValue: (settings?.showRomanization ? 'On' : 'Off'),
-        options: [
-          { value: true, label: 'On' },
-          { value: false, label: 'Off' }
-        ],
-        selected: settings?.showRomanization === true,
-        onChange: (value) => {
-          if (this.settingsRef) this.settingsRef.showRomanization = (value === true);
-          if (settings?.onRomanizationChange) settings.onRomanizationChange(value === true);
-        }
-      },
-      {
-        type: 'submenu',
-        label: 'Hide original lyrics',
-        currentValue: (settings?.hideOriginalLyrics ? 'On' : 'Off'),
-        options: [
-          { value: true, label: 'On' },
-          { value: false, label: 'Off' }
-        ],
-        selected: settings?.hideOriginalLyrics === true,
-        onChange: (value) => {
-          if (this.settingsRef) this.settingsRef.hideOriginalLyrics = (value === true);
-          if (settings?.onHideOriginalLyricsChange) settings.onHideOriginalLyricsChange(value === true);
-        }
-      },
-      {
-        type: 'submenu',
-        label: 'Highlight mode',
-        currentValue: this.getHighlightLabel(settings?.highlightMode || 'line'),
-        options: [
-          { value: 'line', label: 'Full line' },
-          { value: 'word', label: 'Word by word' }
-        ],
-        selected: settings?.highlightMode || 'line',
-        onChange: (value) => {
-          if (settings?.onHighlightModeChange) settings.onHighlightModeChange(value);
-        }
-      },
-      {
-        type: 'submenu',
-        label: 'Gradient theme',
-        currentValue: this.getGradientThemeLabel(settings?.gradientTheme || 'sunset'),
-        options: [
-          { value: 'sunset', label: 'Sunset' },
-          { value: 'ocean', label: 'Ocean' },
-          { value: 'forest', label: 'Forest' },
-          { value: 'fire', label: 'Fire' },
-          { value: 'purple', label: 'Purple Dream' },
-          { value: 'cool', label: 'Cool Blues' },
-          { value: 'warm', label: 'Warm Sunset' },
-          { value: 'northern', label: 'Northern Lights' },
-          { value: 'peach', label: 'Peach' },
-          { value: 'neon', label: 'Neon' }
-        ],
-        selected: settings?.gradientTheme || 'sunset',
-        onChange: (value) => {
-          if (settings?.onGradientThemeChange) settings.onGradientThemeChange(value);
+        checked: settings?.showRomanization === true,
+        onChange: (checked) => {
+          if (this.settingsRef) this.settingsRef.showRomanization = checked;
+          if (settings?.onRomanizationChange) settings.onRomanizationChange(checked);
         }
       }
     ];
+
 
     menuItems.forEach((item, idx) => {
       if (item.type === 'separator') {
@@ -1688,10 +1608,58 @@ export class LyricsUI {
           panel.style.display = 'none';
           container.appendChild(submenu);
         });
+      } else if (item.type === 'toggle') {
+        // Simple toggle switch
+        const toggleContainer = document.createElement('div');
+        toggleContainer.style.cssText = 'display: flex; align-items: center;';
+
+        const toggleSwitch = document.createElement('div');
+        toggleSwitch.style.cssText = `
+          width: 36px;
+          height: 20px;
+          background: ${item.checked ? '#f00' : 'rgba(255, 255, 255, 0.2)'};
+          border-radius: 10px;
+          position: relative;
+          transition: background 0.2s;
+          cursor: pointer;
+        `;
+
+        const toggleKnob = document.createElement('div');
+        toggleKnob.style.cssText = `
+          width: 16px;
+          height: 16px;
+          background: #fff;
+          border-radius: 50%;
+          position: absolute;
+          top: 2px;
+          left: ${item.checked ? '18px' : '2px'};
+          transition: left 0.2s;
+        `;
+
+        toggleSwitch.appendChild(toggleKnob);
+        toggleContainer.appendChild(toggleSwitch);
+        menuItem.appendChild(toggleContainer);
+
+        let isChecked = item.checked;
+
+        menuItem.addEventListener('click', (e) => {
+          e.stopPropagation();
+          isChecked = !isChecked;
+
+          // Update visual
+          toggleSwitch.style.background = isChecked ? '#f00' : 'rgba(255, 255, 255, 0.2)';
+          toggleKnob.style.left = isChecked ? '18px' : '2px';
+
+          // Fire callback
+          if (item.onChange) {
+            item.onChange(isChecked);
+          }
+        });
       }
 
       panel.appendChild(menuItem);
     });
+
 
     return panel;
   }
